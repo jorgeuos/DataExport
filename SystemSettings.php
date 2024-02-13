@@ -1,8 +1,8 @@
 <?php
 /**
- * Matomo - free/libre analytics platform
+ * © 2021 Jorge Powers. All rights reserved.
  *
- * @link https://matomo.org
+ * @link https://jorgeuos.com
  * @license http://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
 
