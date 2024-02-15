@@ -8,7 +8,7 @@ This plugin allows you to export the Matomo database to your local computer.
 And you can easily import the data into another Matomo instance. For example,
 you can use your real data into your development environment.
 
-![Screenshot of the plugin](../screenshots/1-Default-view.png)
+![Screenshot of the plugin](https://plugins.matomo.org/DataExport/images/0.1.0/1-Default-view.png?w=1024)
 
 ### Caution
 
