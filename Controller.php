@@ -123,7 +123,9 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
             if ($error > 0) {
                 throw new \Exception("Error uploading file. Error code: $error.");
             }
-            if ($fileSize > 20971520) { // Example size limit: 20MB
+            // if ($fileSize > 20971520) { // Example size limit: 20MB
+            // Set to 1024MB
+            if ($fileSize > 1073741824) {
                 throw new \Exception("File size exceeds limit.");
             }
             if (!in_array($fileType, [
