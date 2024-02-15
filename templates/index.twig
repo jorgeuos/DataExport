@@ -33,6 +33,11 @@
 <div vue-entry="CoreHome.ContentBlock" content-title="{{ import_title }}" rate="true">
     <form action="{{ linkTo({'action': 'handleDbUpload'}) }}" method="post" enctype="multipart/form-data">
     <p>
+        This is a great feature if you need to import a database dump into your local machine.
+        If you are using this feature on your production server, make sure that you know
+        what you are doing and that you have a recent backup of your database.
+    </p>
+    <p>
         <b>Your current database will be deleted and replaced by the uploaded database dump.</b>
     </p>
     <p>
