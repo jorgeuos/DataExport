@@ -30,7 +30,17 @@ class DatabaseDumpService
         $this->backupDir = PIWIK_USER_PATH . '/tmp/de_backups/';
     }
 
-    public function generateDump()
+    public function zipDump($dumpPath)
+    {
+        $zipPath = $dumpPath . '.zip';
+        $zip = new \ZipArchive();
+        $zip->open($zipPath, \ZipArchive::CREATE);
+        $zip->addFile($dumpPath, basename($dumpPath));
+        $zip->close();
+        return $zipPath;
+    }
+
+    public function generateDump($zipDownload = false)
     {
         $dbConfig = $this->dbConfig;
         $dbName = $dbConfig['dbname'];
@@ -57,6 +67,12 @@ class DatabaseDumpService
 
         if ($returnVar !== 0) {
             throw new \Exception("Failed to generate database dump.");
+        }
+
+        if ($zipDownload) {
+            $zipPath = $this->zipDump($dumpPath);
+            unlink($dumpPath);
+            return $zipPath;
         }
 
         return $dumpPath;

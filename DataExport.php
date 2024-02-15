@@ -14,6 +14,7 @@ class DataExport extends \Piwik\Plugin
     {
         return [
             'CronArchive.getArchivingAPIMethodForPlugin' => 'getArchivingAPIMethodForPlugin',
+            'AssetManager.getJavaScriptFiles' => 'getJavaScriptFiles',
         ];
     }
 
@@ -23,5 +24,10 @@ class DataExport extends \Piwik\Plugin
         if ($plugin == 'DataExport') {
             $method = 'DataExport.getExampleArchivedMetric';
         }
+    }
+
+    public function getJavaScriptFiles(&$jsFiles)
+    {
+        $jsFiles[] = 'plugins/DataExport/javascripts/data-export.js';
     }
 }

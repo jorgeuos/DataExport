@@ -9,12 +9,24 @@
     <p>
         Make sure your DB user has Process tables privileges.
 <pre>
-    GRANT PROCESS ON matomo_db.* TO 'matomo_user'@'matomo_db_host';
+    GRANT PROCESS ON {{dbName}}.* TO '{{dbUser}}'@'YOUR_HOST_OR_%';
     FLUSH PRIVILEGES;
 </pre>
     </p>
     <p>
-            <a href="?module=DataExport&action=downloadDbDump" class="btn btn-primary">Download DB Dump</a>
+        <form action="{{ linkTo({'action': 'downloadDbDump'}) }}" method="post">
+            <p>
+                <span>
+                    <label>
+                        <input type="checkbox" name="zipDownload" id="zipDownload" value="1" {% if zipPreference %}checked{% endif %} />
+                        <span>Download as ZIP</span>
+                    </label>
+                </span>
+            </p>
+            <p>
+                <button type="submit" class="btn btn-primary">Download DB Dump</button>
+            </p>
+        </form>
     </p>
 </div>
 
@@ -24,7 +36,7 @@
         <b>Your current database will be deleted and replaced by the uploaded database dump.</b>
     </p>
     <p>
-        Select database dump to upload:
+        Select database dump(.sql) to upload:
         <input type="file" name="dbDump" id="dbDump">
     </p>
         <br>

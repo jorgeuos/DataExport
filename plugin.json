@@ -8,13 +8,13 @@
     },
     "authors": [
         {
-            "name": "Matomo",
-            "email": "",
-            "homepage": ""
+            "name": "Jorgeuos",
+            "email": "hey@jorgeuos.com",
+            "homepage": "jorgeuos.com"
         }
     ],
     "support": {
-        "email": "",
+        "email": "hey@jorgeuos.com",
         "issues": "",
         "forum": "",
         "irc": "",
@@ -25,5 +25,8 @@
     },
     "homepage": "",
     "license": "GPL v3+",
-    "keywords": []
+    "keywords": [],
+    "autoload": {
+        "psr-4": {"Piwik\\Plugins\\DataExport\\": "."}
+    }
 }

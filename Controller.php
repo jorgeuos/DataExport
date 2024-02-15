@@ -13,6 +13,10 @@ use \Piwik\Plugins\DataExport\Services\DatabaseDumpService;
 use \Piwik\Plugins\DataExport\Services\DatabaseImportService;
 use Piwik\Notification\Manager as NotificationManager;
 use Piwik\Notification;
+use Piwik\Url;
+use Piwik\Plugins\UsersManager\API as UsersManagerAPI;
+use \Piwik\Plugins\DataExport\Helpers\UserHelper;
+
 
 /**
  * A controller lets you for example create a page that can be added to a menu. For more information read our guide
@@ -26,12 +30,23 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
         // For now a logged in user is enough
         Piwik::checkUserIsNotAnonymous();
 
+        $zipPreference = UserHelper::getUserPreference('zipDownloadPreference', false);
+
+        $dbConfig = \Piwik\Config::getInstance()->database;
+        $dbName = $dbConfig['dbname'];
+        $dbUser = $dbConfig['username'];
+        $dbHost = $dbConfig['host'];
+
         // Render the Twig template templates/index.twig and assign the view variable answerToLife to the view.
         return $this->renderTemplate(
             'index',
             array(
                 'title' => Piwik::translate('DataExport_DataExport'),
-                'import_title' => Piwik::translate('DataExport_ImportData')
+                'import_title' => Piwik::translate('DataExport_ImportData'),
+                'zipPreference' => $zipPreference,
+                'dbName' => $dbName,
+                'dbUser' => $dbUser,
+                'dbHost' => $dbHost
             )
         );
     }
@@ -73,16 +88,16 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
      */
     public function downloadDbDump() {
         Piwik::checkUserHasSuperUserAccess();
+        
+        $zipDownload = !empty($_POST['zipDownload']);
+        UserHelper::setUserPreference('zipDownloadPreference', $zipDownload);
+
         try {
             $service = new DatabaseDumpService();
-            $dumpPath = $service->generateDump();
+            $dumpPath = $service->generateDump($zipDownload);
 
             $this->downloadFile($dumpPath);
             unlink($dumpPath);
-
-            $notification = new Notification(Piwik::translate('DataExport_ExportSuccessMessage'));
-            $notification->context = Notification::CONTEXT_SUCCESS;
-            NotificationManager::notify('DataExport_ExportSuccess', $notification);
         } catch (\Exception $e) {
             // Handle the error appropriately
             echo $e->getMessage();
@@ -124,14 +139,27 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
             }
 
             $destPath = $uploadDir . $fileName;
+
             if (move_uploaded_file($fileTmpPath, $destPath)) {
+                // Validate file content
+                $handle = fopen($destPath, "r");
+                if ($handle) {
+                    $firstLine = fgets($handle);
+                    if (!preg_match('/^-- (MariaDB|MySQL) dump \d+/', $firstLine)) {
+                        throw new \Exception("File does not appear to be a valid MySQL dump.");
+                    }
+                    fclose($handle);
+                } else {
+                    throw new \Exception("Unable to read uploaded file.");
+                }
                 $service = new DatabaseImportService();
                 $success = $service->importDump($destPath);
                 if ($success) {
                     $notification = new Notification(Piwik::translate('DataExport_ImportSuccessMessage'));
                     $notification->context = Notification::CONTEXT_SUCCESS;
                     NotificationManager::notify('DataExport_ImportSuccess', $notification);
-                    // $this->redirectToUrl('index');
+                    $urlToRedirect = Url::getCurrentUrlWithoutQueryString();
+                    Url::redirectToUrl($urlToRedirect);
                 }
             } else {
                 throw new \Exception("Failed to move uploaded file.");
