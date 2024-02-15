@@ -15,17 +15,17 @@
     ],
     "support": {
         "email": "hey@jorgeuos.com",
-        "issues": "",
-        "forum": "",
+        "issues": "https://github.com/jorgeuos/DataExport/issues",
+        "forum": "https://forum.matomo.org/",
         "irc": "",
         "wiki": "",
         "source": "",
         "docs": "",
         "rss": ""
     },
-    "homepage": "",
+    "homepage": "https://jorgeuos.com",
     "license": "GPL v3+",
-    "keywords": [],
+    "keywords": ["DataExport", "Export", "Data", "Database", "BI", "Business Intelligence", "Analytics"],
     "autoload": {
         "psr-4": {"Piwik\\Plugins\\DataExport\\": "."}
     }
