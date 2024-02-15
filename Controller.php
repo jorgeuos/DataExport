@@ -9,6 +9,10 @@
 namespace Piwik\Plugins\DataExport;
 
 use Piwik\Piwik;
+use \Piwik\Plugins\DataExport\Services\DatabaseDumpService;
+use \Piwik\Plugins\DataExport\Services\DatabaseImportService;
+use Piwik\Notification\Manager as NotificationManager;
+use Piwik\Notification;
 
 /**
  * A controller lets you for example create a page that can be added to a menu. For more information read our guide
@@ -16,10 +20,8 @@ use Piwik\Piwik;
  * http://developer.piwik.org/api-reference/Piwik/Plugin/Controller and
  * http://developer.piwik.org/api-reference/Piwik/View
  */
-class Controller extends \Piwik\Plugin\ControllerAdmin
-{
-    public function index()
-    {
+class Controller extends \Piwik\Plugin\ControllerAdmin {
+    public function index() {
         // Check that the user has the necessary permissions
         // For now a logged in user is enough
         Piwik::checkUserIsNotAnonymous();
@@ -29,7 +31,7 @@ class Controller extends \Piwik\Plugin\ControllerAdmin
             'index',
             array(
                 'title' => Piwik::translate('DataExport_DataExport'),
-                'answerToLife' => 42
+                'import_title' => Piwik::translate('DataExport_ImportData')
             )
         );
     }
@@ -40,8 +42,7 @@ class Controller extends \Piwik\Plugin\ControllerAdmin
      * @param string $filePath The path to the file to be downloaded.
      * @throws \Exception If the file does not exist or is not readable.
      */
-    protected function downloadFile($filePath)
-    {
+    protected function downloadFile($filePath) {
         if (!file_exists($filePath) || !is_readable($filePath)) {
             throw new \Exception("The file does not exist or is not readable.");
         }
@@ -70,18 +71,73 @@ class Controller extends \Piwik\Plugin\ControllerAdmin
     /**
      * Downloads a DB dump
      */
-    public function downloadDbDump()
-    {
+    public function downloadDbDump() {
         Piwik::checkUserHasSuperUserAccess();
         try {
-            $service = new \Piwik\Plugins\DataExport\Services\DatabaseDumpService();
+            $service = new DatabaseDumpService();
             $dumpPath = $service->generateDump();
-    
+
             $this->downloadFile($dumpPath);
             unlink($dumpPath);
+
+            $notification = new Notification(Piwik::translate('DataExport_ExportSuccessMessage'));
+            $notification->context = Notification::CONTEXT_SUCCESS;
+            NotificationManager::notify('DataExport_ExportSuccess', $notification);
         } catch (\Exception $e) {
             // Handle the error appropriately
             echo $e->getMessage();
+        }
+    }
+
+    public function handleDbUpload() {
+        Piwik::checkUserHasSuperUserAccess();
+
+        if (!empty($_FILES['dbDump']['name'])) {
+            $uploadDir = PIWIK_USER_PATH . '/tmp/de_uploads/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            $fileTmpPath = $_FILES['dbDump']['tmp_name'];
+            $fileName = $_FILES['dbDump']['name'];
+            $fileSize = $_FILES['dbDump']['size'];
+            $fileType = $_FILES['dbDump']['type'];
+            $error = $_FILES['dbDump']['error'];
+
+            // Validate file (size, type, error status)
+            if ($error > 0) {
+                throw new \Exception("Error uploading file. Error code: $error.");
+            }
+            if ($fileSize > 20971520) { // Example size limit: 20MB
+                throw new \Exception("File size exceeds limit.");
+            }
+            if (!in_array($fileType, [
+                'application/octet-stream',
+                'application/sql',
+                'text/plain'
+            ])) {
+                throw new \Exception("Invalid file type.");
+            }
+            $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+            if ($fileExt != 'sql') {
+                throw new \Exception("Invalid file extension.");
+            }
+
+            $destPath = $uploadDir . $fileName;
+            if (move_uploaded_file($fileTmpPath, $destPath)) {
+                $service = new DatabaseImportService();
+                $success = $service->importDump($destPath);
+                if ($success) {
+                    $notification = new Notification(Piwik::translate('DataExport_ImportSuccessMessage'));
+                    $notification->context = Notification::CONTEXT_SUCCESS;
+                    NotificationManager::notify('DataExport_ImportSuccess', $notification);
+                    // $this->redirectToUrl('index');
+                }
+            } else {
+                throw new \Exception("Failed to move uploaded file.");
+            }
+        } else {
+            throw new \Exception("No file uploaded.");
         }
     }
 }

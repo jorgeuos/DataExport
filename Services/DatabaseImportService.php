@@ -8,7 +8,7 @@
 
 namespace Piwik\Plugins\DataExport\Services;
 
-class DatabaseDumpService
+class DatabaseImportService
 {
 
     /**
@@ -22,15 +22,24 @@ class DatabaseDumpService
     protected $backupDir;
 
     /**
+     * @var string
+     */
+    protected $uploadDir;
+
+    /**
      * Constructor.
      */
     public function __construct()
     {
         $this->dbConfig = \Piwik\Config::getInstance()->database;
         $this->backupDir = PIWIK_USER_PATH . '/tmp/de_backups/';
+        $this->uploadDir = PIWIK_USER_PATH . '/tmp/de_uploads/';
     }
 
-    public function generateDump()
+    /**
+     * Import a database dump.
+     */
+    public function importDump($dumpPath)
     {
         $dbConfig = $this->dbConfig;
         $dbName = $dbConfig['dbname'];
@@ -38,14 +47,12 @@ class DatabaseDumpService
         $dbPassword = $dbConfig['password'];
         $dbHost = $dbConfig['host'];
 
-
-        if (!is_dir($this->backupDir)) {
-            mkdir($this->backupDir, 0755, true);
+        if (!file_exists($dumpPath) || !is_readable($dumpPath)) {
+            throw new \Exception("The file does not exist or is not readable.");
         }
 
-        $dumpPath = $this->backupDir . '/dbdump-' . date('Y-m-d_H-i-s') . '.sql';
         $command = sprintf(
-            'mysqldump -u %s -h%s -p%s %s > %s',
+            'mysql -u %s -h%s -p%s %s < %s',
             escapeshellarg($dbUser),
             escapeshellarg($dbHost),
             escapeshellarg($dbPassword),
@@ -56,9 +63,8 @@ class DatabaseDumpService
         exec($command, $output, $returnVar);
 
         if ($returnVar !== 0) {
-            throw new \Exception("Failed to generate database dump.");
+            throw new \Exception("Failed to import database dump.");
         }
-
-        return $dumpPath;
+        return true;
     }
 }

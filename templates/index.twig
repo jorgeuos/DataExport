@@ -7,7 +7,28 @@
         This plugin helps you to Backup and export your database, and also to restore it.
     </p>
     <p>
+        Make sure your DB user has Process tables privileges.
+<pre>
+    GRANT PROCESS ON matomo_db.* TO 'matomo_user'@'matomo_db_host';
+    FLUSH PRIVILEGES;
+</pre>
+    </p>
+    <p>
             <a href="?module=DataExport&action=downloadDbDump" class="btn btn-primary">Download DB Dump</a>
     </p>
+</div>
+
+<div vue-entry="CoreHome.ContentBlock" content-title="{{ import_title }}" rate="true">
+    <form action="{{ linkTo({'action': 'handleDbUpload'}) }}" method="post" enctype="multipart/form-data">
+    <p>
+        <b>Your current database will be deleted and replaced by the uploaded database dump.</b>
+    </p>
+    <p>
+        Select database dump to upload:
+        <input type="file" name="dbDump" id="dbDump">
+    </p>
+        <br>
+        <input type="submit" class="btn btn-primary" value="Upload Database" name="submit">
+    </form>
 </div>
 {% endblock %}

@@ -1,6 +1,9 @@
 {
     "DataExport": {
         "DataExport": "DataExport",
-        "ExportData": "Export Data"
+        "ExportData": "Export Data",
+        "ImportData": "Import Data",
+        "ExportSuccessMessage": "Data exported successfully",
+        "ImportSuccessMessage": "Data imported successfully"
     }
 }
