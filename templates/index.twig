@@ -36,6 +36,14 @@
         <b>Your current database will be deleted and replaced by the uploaded database dump.</b>
     </p>
     <p>
+        <b>PHP Constraints:</b>
+        <ul>
+            <li>memory_limit: {{phpSettings.memory_limit}}</li>
+            <li>upload_max_filesize: {{phpSettings.upload_max_filesize}}</li>
+            <li>post_max_size: {{phpSettings.post_max_size}}</li>
+        </ul>
+    </p>
+    <p>
         Select database dump(.sql) to upload:
         <input type="file" name="dbDump" id="dbDump">
     </p>

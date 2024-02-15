@@ -16,6 +16,7 @@ use Piwik\Notification;
 use Piwik\Url;
 use Piwik\Plugins\UsersManager\API as UsersManagerAPI;
 use \Piwik\Plugins\DataExport\Helpers\UserHelper;
+use \Piwik\Plugins\DataExport\Helpers\PHPHelper;
 
 
 /**
@@ -37,6 +38,8 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
         $dbUser = $dbConfig['username'];
         $dbHost = $dbConfig['host'];
 
+        $phpSettings = PHPHelper::getPhpSettings();
+
         // Render the Twig template templates/index.twig and assign the view variable answerToLife to the view.
         return $this->renderTemplate(
             'index',
@@ -46,7 +49,8 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
                 'zipPreference' => $zipPreference,
                 'dbName' => $dbName,
                 'dbUser' => $dbUser,
-                'dbHost' => $dbHost
+                'dbHost' => $dbHost,
+                'phpSettings' => $phpSettings,
             )
         );
     }

@@ -1,4 +1,11 @@
 <?php
+/**
+ * © 2021 Jorge Powers. All rights reserved.
+ *
+ * @link https://jorgeuos.com
+ * @license http://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
+ */
+
 namespace Piwik\Plugins\DataExport\Helpers;
 
 class UserHelper {
