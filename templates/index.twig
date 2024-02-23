@@ -18,8 +18,24 @@
             <p>
                 <span>
                     <label>
-                        <input type="checkbox" name="zipDownload" id="zipDownload" value="1" {% if zipPreference %}checked{% endif %} />
-                        <span>Download as ZIP</span>
+                        <input type="radio" name="download-preference" id="no-compression" value="none" {% if downloadPreference == "none" %}checked{% endif %} />
+                        <span>No compression</span>
+                    </label>
+                </span>
+            </p>
+            <p>
+                <span>
+                    <label>
+                        <input type="radio" name="download-preference" id="zip-download" value="zip" {% if downloadPreference == "zip" %}checked{% endif %} />
+                        <span>Download as .zip</span>
+                    </label>
+                </span>
+            </p>
+            <p>
+                <span>
+                    <label>
+                        <input type="radio" name="download-preference" id="tar-download" value="tar" {% if downloadPreference == "tar" %}checked{% endif %} />
+                        <span>Download as .tar.gz</span>
                     </label>
                 </span>
             </p>
@@ -41,7 +57,7 @@
         <b>Your current database will be deleted and replaced by the uploaded database dump.</b>
     </p>
     <p>
-        <b>PHP Constraints:</b>
+        <b>Your PHP Constraints:</b>
         <ul>
             <li>memory_limit: {{phpSettings.memory_limit}}</li>
             <li>upload_max_filesize: {{phpSettings.upload_max_filesize}}</li>

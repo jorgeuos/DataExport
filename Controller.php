@@ -14,7 +14,6 @@ use \Piwik\Plugins\DataExport\Services\DatabaseImportService;
 use Piwik\Notification\Manager as NotificationManager;
 use Piwik\Notification;
 use Piwik\Url;
-use Piwik\Plugins\UsersManager\API as UsersManagerAPI;
 use \Piwik\Plugins\DataExport\Helpers\UserHelper;
 use \Piwik\Plugins\DataExport\Helpers\PHPHelper;
 
@@ -31,7 +30,7 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
         // For now a logged in user is enough
         Piwik::checkUserIsNotAnonymous();
 
-        $zipPreference = UserHelper::getUserPreference('zipDownloadPreference', false);
+        $downloadPreference = UserHelper::getUserPreference('downloadPreference', 'none');
 
         $dbConfig = \Piwik\Config::getInstance()->database;
         $dbName = $dbConfig['dbname'];
@@ -46,7 +45,7 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
             array(
                 'title' => Piwik::translate('DataExport_DataExport'),
                 'import_title' => Piwik::translate('DataExport_ImportData'),
-                'zipPreference' => $zipPreference,
+                'downloadPreference' => $downloadPreference,
                 'dbName' => $dbName,
                 'dbUser' => $dbUser,
                 'dbHost' => $dbHost,
@@ -92,16 +91,17 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
      */
     public function downloadDbDump() {
         Piwik::checkUserHasSuperUserAccess();
-        
-        $zipDownload = !empty($_POST['zipDownload']);
-        UserHelper::setUserPreference('zipDownloadPreference', $zipDownload);
+
+        // Correctly escape the user input
+        $downloadPreference = !empty($_POST['download-preference']) ? htmlspecialchars($_POST['download-preference'], ENT_QUOTES, 'UTF-8') : 'none';
+
+        UserHelper::setUserPreference('downloadPreference', $downloadPreference);
 
         try {
             $service = new DatabaseDumpService();
-            $dumpPath = $service->generateDump($zipDownload);
+            $dumpPath = $service->generateDump($downloadPreference);
 
             $this->downloadFile($dumpPath);
-            unlink($dumpPath);
         } catch (\Exception $e) {
             // Handle the error appropriately
             echo $e->getMessage();
