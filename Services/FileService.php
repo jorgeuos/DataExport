@@ -8,6 +8,9 @@
 
 namespace Piwik\Plugins\DataExport\Services;
 
+use Piwik\Container\StaticContainer;
+use Psr\Log\LoggerInterface;
+
 class FileService {
 
     /**
@@ -23,8 +26,8 @@ class FileService {
     /**
      * Constructor.
      */
-    public function __construct($logger = null) {
-        $this->logger = $logger;
+    public function __construct(LoggerInterface $logger = null) {
+        $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
         $this->backupDir = PIWIK_USER_PATH . '/tmp/de_backups/';
     }
 
@@ -78,4 +81,44 @@ class FileService {
             return $dumpPath;
         }
     }
+
+    /**
+     * Deletes old backup files from the backup folder.
+     */
+    public function cleanBackupsFolder($force = null){
+        $this->logger->info("Run cleanup task");
+        $backupFolder = $this->backupDir;
+        $filePatterns = ['*.sql', '*.zip', '*.tar.gz'];
+        $daysOld = 7;
+    
+        // Calculate the threshold date/time for deletion
+        $thresholdTime = time() - ($daysOld * 24 * 60 * 60);
+        if($force){
+            $thresholdTime = time();
+        }
+    
+        foreach ($filePatterns as $pattern) {
+            // Use glob to find matching files
+            $files = glob($backupFolder . $pattern);
+
+            foreach ($files as $file) {
+                $this->logger->info("Checking $file");
+                // Check if file modification time is older than the threshold
+                if (filemtime($file) < $thresholdTime) {
+                    if (unlink($file)) {
+                        $this->logger->info("Deleted $file");
+                    } else {
+                        // Log an error or throw an exception if the file couldn't be deleted
+                        $this->logger->debug("Error deleting $file");
+                    }
+                }
+                else {
+                    $this->logger->info("Not old enough to delete $file");
+                    $this->logger->info("Age: " . filemtime($file));
+                }
+            }
+        }
+    }
+    
+
 }

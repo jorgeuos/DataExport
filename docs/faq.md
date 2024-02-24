@@ -1,5 +1,9 @@
 ## FAQ
 
-__My question?__
+__Where goes the files on the server?__
 
-My answer
+```sh
+$MATOMO_ROOT/tmp/de_backups/{dbdump}-{Y-m-d_H-i-s}.sql
+```
+
+

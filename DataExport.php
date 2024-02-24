@@ -7,7 +7,7 @@
  * Description: Export database or connect to your BI tools.
  * Author: Jorgeuos
  * Author URI: https://jorgeuos.com
- * Version: 0.1.1
+ * Version: 0.1.2
  * @link https://jorgeuos.com
  * @license http://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
@@ -32,4 +32,5 @@ class DataExport extends \Piwik\Plugin {
     public function getJavaScriptFiles(&$jsFiles) {
         $jsFiles[] = 'plugins/DataExport/javascripts/data-export.js';
     }
+
 }
