@@ -17,8 +17,7 @@ use Piwik\Validators\NotEmpty;
  *
  * Usage like this:
  * $settings = new SystemSettings();
- * $settings->metric->getValue();
- * $settings->description->getValue();
+ * $settings->dataExportBackupPath->getValue();
  */
 class SystemSettings extends \Piwik\Settings\Plugin\SystemSettings
 {
@@ -28,7 +27,7 @@ class SystemSettings extends \Piwik\Settings\Plugin\SystemSettings
     protected function init()
     {
         // System setting --> textinput
-        $this->password = $this->createPathSetting();
+        $this->dataExportBackupPath = $this->createPathSetting();
     }
 
     private function createPathSetting()

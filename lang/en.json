@@ -4,6 +4,8 @@
         "ExportData": "Export Data",
         "ImportData": "Import Data",
         "ExportSuccessMessage": "Data exported successfully",
-        "ImportSuccessMessage": "Data imported successfully"
+        "ImportSuccessMessage": "Data imported successfully",
+        "CsvExport": "CSV Export",
+        "CsvEmptyMessage": "No data to export for the given date"
     }
 }

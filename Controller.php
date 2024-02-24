@@ -45,6 +45,7 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
             array(
                 'title' => Piwik::translate('DataExport_DataExport'),
                 'import_title' => Piwik::translate('DataExport_ImportData'),
+                'csv_title' => Piwik::translate('DataExport_CsvExport'),
                 'downloadPreference' => $downloadPreference,
                 'dbName' => $dbName,
                 'dbUser' => $dbUser,
@@ -164,14 +165,42 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
                     $notification = new Notification(Piwik::translate('DataExport_ImportSuccessMessage'));
                     $notification->context = Notification::CONTEXT_SUCCESS;
                     NotificationManager::notify('DataExport_ImportSuccess', $notification);
-                    $urlToRedirect = Url::getCurrentUrlWithoutQueryString();
-                    Url::redirectToUrl($urlToRedirect);
+                    $url = Url::getCurrentQueryStringWithParametersModified([
+                        'module' => 'DataExport',
+                        'action' => 'index'
+                    ]);
+                    Url::redirectToUrl('index.php' . $url);
                 }
             } else {
                 throw new \Exception("Failed to move uploaded file.");
             }
         } else {
             throw new \Exception("No file uploaded.");
+        }
+    }
+
+    public function selectAllVisitsAndActions() {
+        Piwik::checkUserHasSuperUserAccess();
+
+        $date = !empty($_POST['date']) ? htmlspecialchars($_POST['date'], ENT_QUOTES, 'UTF-8') : 'yesterday';
+
+        try {
+            $service = new DatabaseDumpService();
+            $dumpPath = $service->selectAllVisitsAndActions(null, $date);
+            if (!$dumpPath) {
+                $notification = new Notification(Piwik::translate('DataExport_CsvEmptyMessage'));
+                $notification->context = Notification::CONTEXT_WARNING;
+                NotificationManager::notify('DataExport_CsvEmptyMessage', $notification);
+                $url = Url::getCurrentQueryStringWithParametersModified([
+                    'module' => 'DataExport',
+                    'action' => 'index'
+                ]);
+                Url::redirectToUrl('index.php' . $url);
+            }
+            $this->downloadFile($dumpPath);
+        } catch (\Exception $e) {
+            // Handle the error appropriately
+            echo $e->getMessage();
         }
     }
 }

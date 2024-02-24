@@ -8,7 +8,20 @@ you can use your real data into your development environment.
 
 ### Caution
 
-This plugin is not designed for exporting/importing large data sets(yet).
+This plugin is not designed for exporting/importing large data sets(yet). Use at your own risk.
+
+## Features
+
+- Export and download the database to a file
+- Import a database from a file
+- Export and download raw data to a CSV file
+- Console commands to:
+  - Dump the database
+  - Import the database
+  - Create the database
+  - Drop the database
+  - Cleanup old backups
+  - Export queries to CSV
 
 ## In the works
 
@@ -24,6 +37,14 @@ Install it via Matomo Marketplace
 
 Navigate to `Admin` -> `Platform` -> `Data Export` and follow the instructions.
 
+## The UI
+
+The UI is pretty straightforward. You can export the database, import a database, and export raw data to a CSV file.
+
+### Raw data exports
+
+I have collected a few queries from the Matomos faq: [How do I write SQL queries...](https://matomo.org/faq/how-to/how-do-i-write-sql-queries-to-select-visitors-list-of-pageviews-searches-events-in-the-matomo-database/).
+
 ## Command line
 
 ### DB commands
@@ -32,6 +53,7 @@ $ ./console db:dump
 $ ./console db:import
 $ ./console db:drop
 $ ./console db:create
+
 ```
 
 ### Cleanup command
