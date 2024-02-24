@@ -114,6 +114,24 @@ AND visit_last_action_time <= "2024-02-24 23:59:59";
 				<button type="submit" class="btn btn-primary">Select all visits and actions: Export to CSV</button>
 			</p>
 		</form>
+		<form action="{{ linkTo({'action': 'selectAllVisitsAndActionsSiteId '}) }}" method="post">
+			<p>
+				<label for="date">
+					<b>
+						Date:
+					</b>
+				</label>
+			</p>
+			<p>
+				<input type="date" id="date" name="date" value="" style="max-width:200px;">
+			</p>
+			<p>
+				<input type="text" id="siteId" name="siteId" value="" style="max-width:200px;">
+			</p>
+			<p>
+				<button type="submit" class="btn btn-primary">Select all visits and actions: Export to CSV</button>
+			</p>
+		</form>
 	</div>
 {% endblock %}
 

@@ -83,7 +83,7 @@ class DatabaseDumpService {
         return $fullPath;
     }
 
-    public function selectAllVisitsAndActions($dumpPath = null, $date = 'yesterday') {
+    public function selectAllVisitsAndActions($dumpPath = null, $date = 'yesterday', $siteId = null) {
         $this->logger->info('Exporting database to CSV...');
         $this->logger->info('Dump path: ' . $dumpPath);
 
@@ -98,8 +98,6 @@ class DatabaseDumpService {
             $dateEnd = date('Y-m-d', strtotime($dayString)) . ' 23:59:59';
         }
 
-        $this->logger->info('Parameters: ' . print_r(['start' => $dateStart, 'end' => $dateEnd], true));
-        
         try {
             $sql = 'SELECT *
                     FROM matomo_log_visit 
@@ -108,7 +106,12 @@ class DatabaseDumpService {
                     LEFT JOIN matomo_log_conversion ON matomo_log_visit.idvisit = matomo_log_conversion.idvisit 
                     LEFT JOIN matomo_log_conversion_item ON matomo_log_visit.idvisit = matomo_log_conversion_item.idvisit
                     WHERE visit_last_action_time >= "' . $dateStart . '"
-                    AND visit_last_action_time <= "' . $dateEnd . '";';
+                    AND visit_last_action_time <= "' . $dateEnd . '"';
+            if ($siteId) {
+                $sql .= ' AND idsite = ' . $siteId;
+            }
+            $sql .= ';';
+
             
             $this->logger->debug('SQL: ' . $sql);
             // Use parameterized query for security and flexibility

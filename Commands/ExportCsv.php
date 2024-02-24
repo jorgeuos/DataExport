@@ -29,6 +29,11 @@ class ExportCsv extends ConsoleCommand
             'r',
             'Which report to export. Defaults to selectAllVisitsAndActions',
         );
+        $this->addOptionalValueOption(
+            'date',
+            'd',
+            'Date to export. Defaults to yesterday.',
+        );
     }
 
     protected function doExecute(): int
@@ -42,8 +47,18 @@ class ExportCsv extends ConsoleCommand
             $dest = $fileService->getBackupDir() . $dest;
         }
 
+        $date = $input->getOption('date');
+
         $databaseDumpService = new DatabaseDumpService();
-        $databaseDumpService->selectAllVisitsAndActions($dest);
+
+        if ($input->getOption('report') == 'selectAllVisitsAndActionsSiteId') {
+            $siteId = $input->getOption('siteId');
+            $databaseDumpService->selectAllVisitsAndActions($dest, $date, $siteId);
+        }
+        else {
+            $databaseDumpService->selectAllVisitsAndActions($dest, $date);
+        }
+
 
         $message = sprintf('<info>ExportCsv: CSV created.</info>');
         $output->writeln($message);
