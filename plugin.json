@@ -4,7 +4,7 @@
     "version": "0.1.1",
     "theme": false,
     "require": {
-        "matomo": ">=5.0.0-stable,<6.0.0-b1"
+        "matomo": ">=5.0.2-stable,<6.0.0-b1"
     },
     "authors": [
         {
@@ -15,18 +15,28 @@
     ],
     "support": {
         "email": "hey@jorgeuos.com",
-        "issues": "https://github.com/jorgeuos/DataExport/issues",
-        "forum": "https://forum.matomo.org/",
+        "issues": "https:\/\/github.com\/jorgeuos\/DataExport\/issues",
+        "forum": "https:\/\/forum.matomo.org\/",
         "irc": "",
         "wiki": "",
         "source": "",
         "docs": "",
         "rss": ""
     },
-    "homepage": "https://jorgeuos.com",
+    "homepage": "https:\/\/jorgeuos.com",
     "license": "GPL v3+",
-    "keywords": ["DataExport", "Export", "Data", "Database", "BI", "Business Intelligence", "Analytics"],
+    "keywords": [
+        "DataExport",
+        "Export",
+        "Data",
+        "Database",
+        "BI",
+        "Business Intelligence",
+        "Analytics"
+    ],
     "autoload": {
-        "psr-4": {"Piwik\\Plugins\\DataExport\\": "."}
+        "psr-4": {
+            "Piwik\\Plugins\\DataExport\\": "."
+        }
     }
 }

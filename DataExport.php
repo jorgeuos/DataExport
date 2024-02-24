@@ -1,6 +1,6 @@
 <?php
 /**
- * © 2021 Jorge Powers. All rights reserved.
+ * © 2024 Jorge Powers. All rights reserved.
  *
  * Plugin Name: Data Export (Matomo Plugin)
  * Plugin URI: http://plugins.matomo.org/DataExport

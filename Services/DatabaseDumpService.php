@@ -1,12 +1,16 @@
 <?php
 /**
- * © 2021 Jorge Powers. All rights reserved.
+ * © 2024 Jorge Powers. All rights reserved.
  *
  * @link https://jorgeuos.com
  * @license http://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
 
 namespace Piwik\Plugins\DataExport\Services;
+
+use Piwik\Plugins\DataExport\Services\FileService;
+use Piwik\Container\StaticContainer;
+use Psr\Log\LoggerInterface;
 
 class DatabaseDumpService {
 
@@ -21,60 +25,41 @@ class DatabaseDumpService {
     protected $backupDir;
 
     /**
+     * @var \Psr\Log\LoggerInterface
+     */
+    protected $logger;
+
+    /**
      * Constructor.
      */
-    public function __construct() {
+    public function __construct(LoggerInterface $logger = null) {
+        $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
         $this->dbConfig = \Piwik\Config::getInstance()->database;
         $this->backupDir = PIWIK_USER_PATH . '/tmp/de_backups/';
     }
 
-    private function zipDump($dumpPath) {
-        $zipPath = $dumpPath . '.zip';
-        $zip = new \ZipArchive();
-        $zip->open($zipPath, \ZipArchive::CREATE);
-        $zip->addFile($dumpPath, basename($dumpPath));
-        $zip->close();
-        unlink($dumpPath);
-        return $zipPath;
-    }
-
-    private function tarDump($dumpPath) {
-        $tarPath = $dumpPath . '.tar'; // Create a .tar archive first
-        $gzPath = $tarPath . '.gz'; // Specify the final .gz path
-
-        $tar = new \PharData($tarPath);
-        // Add only the SQL dump file to the archive
-        $tar->addFile($dumpPath, basename($dumpPath));
-
-        // Compress the .tar file to .gz separately
-        $tar->compress(\Phar::GZ);
-
-        // At this point, a .tar.gz file is created, remove the .tar file
-        unlink($tarPath); // Remove the intermediate .tar file
-        unlink($dumpPath); // Remove the original dump file
-
-        return $gzPath; // Return the path to th
-    }
-
-    public function generateDump($downloadPreference = 'none') {
+    public function generateDump($downloadPreference = 'none', $dumpPath = null) {
+        $this->logger->debug('Generating database dump...');
+        $this->logger->debug('Download preference: ' . $downloadPreference);
+        $this->logger->debug('Dump path: ' . $dumpPath);
         $dbConfig = $this->dbConfig;
         $dbName = $dbConfig['dbname'];
         $dbUser = $dbConfig['username'];
         $dbPassword = $dbConfig['password'];
         $dbHost = $dbConfig['host'];
 
-
-        if (!is_dir($this->backupDir)) {
-            mkdir($this->backupDir, 0755, true);
+        $fileService = new FileService();
+        $fullPath = $this->backupDir . 'dbdump-' . date('Y-m-d_H-i-s') . '.sql';
+        if ($dumpPath) {
+            $fullPath = $dumpPath;
         }
 
-        $dumpPath = $this->backupDir . 'dbdump-' . date('Y-m-d_H-i-s') . '.sql';
         $command = sprintf(
             'mysqldump -u %s -h%s %s > %s',
             escapeshellarg($dbUser),
             escapeshellarg($dbHost),
             escapeshellarg($dbName),
-            escapeshellarg($dumpPath)
+            escapeshellarg($fullPath)
         );
 
         putenv('MYSQL_PWD=' . $dbPassword);
@@ -85,13 +70,8 @@ class DatabaseDumpService {
             throw new \Exception("Failed to generate database dump.");
         }
 
-        if ($downloadPreference === 'zip') {
-            $dumpPath = $this->zipDump($dumpPath);
-        }
+        $fullPath = $fileService->compressDump($fullPath, $downloadPreference);
 
-        if ($downloadPreference === 'tar') {
-            $dumpPath = $this->tarDump($dumpPath);
-        }
-        return $dumpPath;
+        return $fullPath;
     }
 }
