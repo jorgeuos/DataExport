@@ -17,16 +17,8 @@ namespace Piwik\Plugins\DataExport;
 class DataExport extends \Piwik\Plugin {
     public function registerEvents() {
         return [
-            'CronArchive.getArchivingAPIMethodForPlugin' => 'getArchivingAPIMethodForPlugin',
             'AssetManager.getJavaScriptFiles' => 'getJavaScriptFiles',
         ];
-    }
-
-    // support archiving just this plugin via core:archive
-    public function getArchivingAPIMethodForPlugin(&$method, $plugin) {
-        if ($plugin == 'DataExport') {
-            $method = 'DataExport.getExampleArchivedMetric';
-        }
     }
 
     public function getJavaScriptFiles(&$jsFiles) {

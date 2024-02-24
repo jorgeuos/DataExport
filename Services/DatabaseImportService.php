@@ -8,6 +8,8 @@
 
 namespace Piwik\Plugins\DataExport\Services;
 
+use Piwik\Plugins\DataExport\Services\FileService;
+
 class DatabaseImportService
 {
 
@@ -32,7 +34,8 @@ class DatabaseImportService
     public function __construct()
     {
         $this->dbConfig = \Piwik\Config::getInstance()->database;
-        $this->backupDir = PIWIK_USER_PATH . '/tmp/de_backups/';
+        $fileService = new FileService();
+        $this->backupDir = $fileService->getBackupDir();
         $this->uploadDir = PIWIK_USER_PATH . '/tmp/de_uploads/';
     }
 

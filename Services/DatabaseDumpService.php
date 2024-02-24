@@ -35,7 +35,8 @@ class DatabaseDumpService {
     public function __construct(LoggerInterface $logger = null) {
         $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
         $this->dbConfig = \Piwik\Config::getInstance()->database;
-        $this->backupDir = PIWIK_USER_PATH . '/tmp/de_backups/';
+        $fileService = new FileService();
+        $this->backupDir = $fileService->getBackupDir();
     }
 
     public function generateDump($downloadPreference = 'none', $dumpPath = null) {

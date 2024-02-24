@@ -10,6 +10,7 @@ namespace Piwik\Plugins\DataExport\Services;
 
 use Piwik\Container\StaticContainer;
 use Psr\Log\LoggerInterface;
+use Piwik\Plugins\DataExport\SystemSettings;
 
 class FileService {
 
@@ -23,12 +24,15 @@ class FileService {
      */
     protected $logger;
 
+    protected $settings;
+
     /**
      * Constructor.
      */
     public function __construct(LoggerInterface $logger = null) {
         $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
         $this->backupDir = PIWIK_USER_PATH . '/tmp/de_backups/';
+        $this->settings = new SystemSettings();
     }
 
     private function zipDump(string $dumpPath) {
@@ -80,6 +84,18 @@ class FileService {
         } else {
             return $dumpPath;
         }
+    }
+
+    public function getBackupDir() {
+        $customPath = $this->settings->dataExportBackupPath->getValue();
+        if ($customPath) {
+            // Check if the custom path has a trailing slash, if not, add it
+            if (substr($customPath, -1) != '/') {
+                $customPath .= '/';
+            }
+            $this->backupDir = $customPath;
+        }
+        return $this->backupDir;
     }
 
     /**
