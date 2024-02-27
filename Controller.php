@@ -8,15 +8,16 @@
 
 namespace Piwik\Plugins\DataExport;
 
+use Piwik\Url;
 use Piwik\Piwik;
+use Piwik\Request;
+use Piwik\Notification;
+use \Piwik\Plugins\DataExport\Helpers\PHPHelper;
+use \Piwik\Plugins\DataExport\Helpers\UserHelper;
+use \Piwik\Plugins\DataExport\Services\FileService;
+use Piwik\Notification\Manager as NotificationManager;
 use \Piwik\Plugins\DataExport\Services\DatabaseDumpService;
 use \Piwik\Plugins\DataExport\Services\DatabaseImportService;
-use Piwik\Notification\Manager as NotificationManager;
-use Piwik\Notification;
-use Piwik\Url;
-use \Piwik\Plugins\DataExport\Helpers\UserHelper;
-use \Piwik\Plugins\DataExport\Helpers\PHPHelper;
-
 
 /**
  * A controller lets you for example create a page that can be added to a menu. For more information read our guide
@@ -38,6 +39,9 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
         $dbHost = $dbConfig['host'];
 
         $phpSettings = PHPHelper::getPhpSettings();
+        $fileService = new FileService();
+        $files = $fileService->getFilesInBackupDir();
+        var_dump($files);
 
         // Render the Twig template templates/index.twig and assign the view variable answerToLife to the view.
         return $this->renderTemplate(
@@ -51,6 +55,7 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
                 'dbUser' => $dbUser,
                 'dbHost' => $dbHost,
                 'phpSettings' => $phpSettings,
+                'files' => $files,
             )
         );
     }
@@ -62,29 +67,8 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
      * @throws \Exception If the file does not exist or is not readable.
      */
     protected function downloadFile($filePath) {
-        if (!file_exists($filePath) || !is_readable($filePath)) {
-            throw new \Exception("The file does not exist or is not readable.");
-        }
-
-        // Set headers to force the download
-        header('Content-Description: File Transfer');
-        header('Content-Type: application/octet-stream');
-        header('Content-Disposition: attachment; filename="' . basename($filePath) . '"');
-        header('Expires: 0');
-        header('Cache-Control: must-revalidate');
-        header('Pragma: public');
-        header('Content-Length: ' . filesize($filePath));
-
-        // Clear output buffer before reading the file
-        while (ob_get_level()) {
-            ob_end_clean();
-        }
-
-        // Read the file and output its contents
-        readfile($filePath);
-
-        // Terminate the script to prevent sending additional output
-        exit;
+        $fileService = new FileService();
+        $fileService->downloadFile($filePath);
     }
 
     /**
@@ -182,11 +166,15 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
     public function selectAllVisitsAndActions() {
         Piwik::checkUserHasSuperUserAccess();
 
-        $date = !empty($_POST['date']) ? htmlspecialchars($_POST['date'], ENT_QUOTES, 'UTF-8') : 'yesterday';
+        $siteId = Request::fromRequest()->getIntegerParameter('idSite', 0);
+        $date = Request::fromPost()->getStringParameter('date', 'yesterday');
+        if (!$date || $date == 'yesterday') {
+            $date = Request::fromRequest()->getStringParameter('date', 'yesterday');
+        }
 
         try {
             $service = new DatabaseDumpService();
-            $dumpPath = $service->selectAllVisitsAndActions(null, $date);
+            $dumpPath = $service->selectAllVisitsAndActions(null, $date, $siteId);
             if (!$dumpPath) {
                 $notification = new Notification(Piwik::translate('DataExport_CsvEmptyMessage'));
                 $notification->context = Notification::CONTEXT_WARNING;

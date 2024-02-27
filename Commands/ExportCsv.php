@@ -31,7 +31,7 @@ class ExportCsv extends ConsoleCommand
         );
         $this->addOptionalValueOption(
             'date',
-            'd',
+            null,
             'Date to export. Defaults to yesterday.',
         );
     }

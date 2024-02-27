@@ -83,32 +83,24 @@ class DatabaseDumpService {
         return $fullPath;
     }
 
-    public function selectAllVisitsAndActions($dumpPath = null, $date = 'yesterday', $siteId = null) {
-        $this->logger->info('Exporting database to CSV...');
-        $this->logger->info('Dump path: ' . $dumpPath);
-
+    public function selectAllVisitsAndActionsData($date = 'yesterday', $siteId = null){
         // Set the date range for the export
         $dateStart = date('Y-m-d', strtotime($date)) . ' 00:00:00';
         $dateEnd = date('Y-m-d', strtotime($date)) . ' 23:59:59';
-        if ($date === 'yesterday') {
-            // Calculate date, in UTC
-            $days = 1;
-            $dayString = '-' . $days . ' days';
-            $dateStart = date('Y-m-d', strtotime($dayString)) . ' 00:00:00';
-            $dateEnd = date('Y-m-d', strtotime($dayString)) . ' 23:59:59';
-        }
-
+        $dumpDate = date('Y-m-d', strtotime($date));
+        
         try {
             $sql = 'SELECT *
-                    FROM matomo_log_visit 
-                    LEFT JOIN matomo_log_link_visit_action ON matomo_log_visit.idvisit = matomo_log_link_visit_action.idvisit 
+                    FROM matomo_log_visit AS mlv
+                    LEFT JOIN matomo_log_link_visit_action ON mlv.idvisit = matomo_log_link_visit_action.idvisit 
                     LEFT JOIN matomo_log_action ON matomo_log_action.idaction = matomo_log_link_visit_action.idaction_url 
-                    LEFT JOIN matomo_log_conversion ON matomo_log_visit.idvisit = matomo_log_conversion.idvisit 
-                    LEFT JOIN matomo_log_conversion_item ON matomo_log_visit.idvisit = matomo_log_conversion_item.idvisit
+                    LEFT JOIN matomo_log_conversion ON mlv.idvisit = matomo_log_conversion.idvisit 
+                    LEFT JOIN matomo_log_conversion_item ON mlv.idvisit = matomo_log_conversion_item.idvisit
                     WHERE visit_last_action_time >= "' . $dateStart . '"
-                    AND visit_last_action_time <= "' . $dateEnd . '"';
-            if ($siteId) {
-                $sql .= ' AND idsite = ' . $siteId;
+                    AND visit_last_action_time <= "' . $dateEnd . '"
+                    ';
+            if ($siteId && $siteId > 0 && $siteId != 'all') {
+                $sql .= ' AND mlv.idsite = ' . $siteId;
             }
             $sql .= ';';
 
@@ -120,13 +112,25 @@ class DatabaseDumpService {
             $this->logger->error('Error exporting data to CSV: ' . $e->getMessage());
             return false;
         }
+        return $data;
+    }
+
+    public function selectAllVisitsAndActions($dumpPath = null, $date = 'yesterday', $siteId = null) {
+        $this->logger->info('Exporting database to CSV...');
+        $this->logger->info('Dump path: ' . $dumpPath);
+
+        // Get the data
+        $data = $this->selectAllVisitsAndActionsData($date, $siteId);
         if (empty($data)) {
             $this->logger->info('No data to export for the specified period.');
             return false;
         }
 
         // Determine the file path
-        $fileName = 'dbdump-' . date('Y-m-d_H-i-s') . '.csv';
+        $sites = $siteId != null && $siteId < 0 ? 'site-' . $siteId : 'all-sites';
+        $now = date('Y-m-d_H-i-s', strtotime('now'));
+        $fileName = 'dump-' . $dumpDate . '-' . $sites .'-' . $now . '.csv';
+
         $fullPath = $dumpPath ? $dumpPath : $this->backupDir . $fileName;
 
         // Write the data to the file
