@@ -6,6 +6,7 @@
         "ExportSuccessMessage": "Data exported successfully",
         "ImportSuccessMessage": "Data imported successfully",
         "CsvExport": "CSV Export",
-        "CsvEmptyMessage": "No data to export for the given date"
+        "CsvEmptyMessage": "No data to export for the given date",
+        "FilesDeletedMessage": "Files deleted successfully"
     }
 }

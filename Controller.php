@@ -26,11 +26,12 @@ use \Piwik\Plugins\DataExport\Services\DatabaseImportService;
  * http://developer.piwik.org/api-reference/Piwik/View
  */
 class Controller extends \Piwik\Plugin\ControllerAdmin {
-    public function index() {
-        // Check that the user has the necessary permissions
-        // For now a logged in user is enough
-        Piwik::checkUserIsNotAnonymous();
 
+    public function index() {
+        return $this->indexHome();
+    }
+
+    public function indexHome(){
         $downloadPreference = UserHelper::getUserPreference('downloadPreference', 'none');
 
         $dbConfig = \Piwik\Config::getInstance()->database;
@@ -41,7 +42,6 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
         $phpSettings = PHPHelper::getPhpSettings();
         $fileService = new FileService();
         $files = $fileService->getFilesInBackupDir();
-        var_dump($files);
 
         // Render the Twig template templates/index.twig and assign the view variable answerToLife to the view.
         return $this->renderTemplate(
@@ -55,7 +55,8 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
                 'dbUser' => $dbUser,
                 'dbHost' => $dbHost,
                 'phpSettings' => $phpSettings,
-                'files' => $files,
+                'files' => $files['files'],
+                'totalFilesSize' => $files['size'],
             )
         );
     }
@@ -191,4 +192,15 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
             echo $e->getMessage();
         }
     }
+
+    public function deleteFiles($files = null) {
+        Piwik::checkUserHasSuperUserAccess();
+        $files = Request::fromPost()->getArrayParameter('files', []);
+        $service = new FileService();
+        $service->deleteFiles($files);
+        $notification = new Notification(Piwik::translate('DataExport_FilesDeletedMessage'));
+        $notification->context = Notification::CONTEXT_SUCCESS;
+        return $this->indexHome();
+    }
+
 }

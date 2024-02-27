@@ -8,7 +8,7 @@
 		</p>
 		<p>
 			Make sure your DB user has Process tables privileges.
-<pre>
+			<pre>
 GRANT PROCESS ON {{dbName}}.* TO '{{dbUser}}'@'YOUR_HOST_OR_%';
 FLUSH PRIVILEGES;
 </pre>
@@ -50,8 +50,8 @@ FLUSH PRIVILEGES;
 		<form action="{{ linkTo({'action': 'handleDbUpload'}) }}" method="post" enctype="multipart/form-data">
 			<p>
 				This is a great feature if you need to import a database dump into your local machine.
-								        If you are using this feature on your production server, make sure that you know
-								        what you are doing and that you have a recent backup of your database.
+																        If you are using this feature on your production server, make sure that you know
+																        what you are doing and that you have a recent backup of your database.
 			</p>
 			<p>
 				<b>Your current database will be deleted and replaced by the uploaded database dump.</b>
@@ -77,13 +77,13 @@ FLUSH PRIVILEGES;
 	</div>
 	<div vue-entry="CoreHome.ContentBlock" content-title="{{ csv_title }}" rate="true">
 		<p>
-			I have collected a few queries from the Matomos faq: <a href="https://matomo.org/faq/how-to/how-do-i-write-sql-queries-to-select-visitors-list-of-pageviews-searches-events-in-the-matomo-database/" title="How do I write SQL queries to select visitors, list of pageviews, searches, events in the Matomo database?" target="_blank" rel="noreferrer"
-      >How do I write SQL queries...</a>.
+			I have collected a few queries from the Matomos faq:
+			<a href="https://matomo.org/faq/how-to/how-do-i-write-sql-queries-to-select-visitors-list-of-pageviews-searches-events-in-the-matomo-database/" title="How do I write SQL queries to select visitors, list of pageviews, searches, events in the Matomo database?" target="_blank" rel="noreferrer">How do I write SQL queries...</a>.
 		</p>
 		<p>
 			Download Raw logs into a CSV. For performance reasons, it is only possible to export per day.
 		</p>
-    <h2>Select all visits and actions</h2>
+		<h2>Select all visits and actions</h2>
 		<p>
 			<b>Example:</b>
 			If you want to export the logs for the 24th of February 2024, you would select the date 2024-02-24.<br>
@@ -99,11 +99,8 @@ WHERE visit_last_action_time >= "2024-02-24 00:00:00"
 AND visit_last_action_time <= "2024-02-24 23:59:59";
             </pre>
 		</p>
-		<form action="{{ linkTo({
-			'module': 'DataExport',
-			'action': 'selectAllVisitsAndActions',
-			}) }}" method="post">
-		<input type="hidden" name="idSite" value="all">
+		<form action="{{ linkTo({ 'module': 'DataExport', 'action': 'selectAllVisitsAndActions', }) }}" method="post">
+			<input type="hidden" name="idSite" value="all">
 			<p>
 				<label for="date">
 					<b>
@@ -119,27 +116,44 @@ AND visit_last_action_time <= "2024-02-24 23:59:59";
 			</p>
 		</form>
 	</div>
-	<div vue-entry="DataExport.CsvSection">
-	</div>
+	<div vue-entry="DataExport.CsvSection"></div>
 	{# <div
-        vue-entry="CoreHome.SiteSelector"
-        show-selected-site="true"
-        class="sites_autocomplete"
-    ></div> #}
-		<div vue-entry="CoreHome.ContentBlock" content-title="{{ import_title }}" rate="true">
-		<form action="{{ linkTo({'action': 'deleteFile'}) }}" method="post" enctype="multipart/form-data">
+		        vue-entry="CoreHome.SiteSelector"
+		        show-selected-site="true"
+		        class="sites_autocomplete"
+		    ></div> #}
+	<div vue-entry="CoreHome.ContentBlock" content-title="{{ import_title }}" rate="true">
+		<form action="{{ linkTo({'action': 'deleteFiles'}) }}" method="post" enctype="multipart/form-data">
 			<p>
-			For your performance, you can delete the database dumps.
+				For your performance, you can delete the database dumps.
 			</p>
 			<p>
-				{% for file in files %}
-				<input type="checkbox" name="file[]" value="{{ file }}">{{ file }}<br>
-				{% endfor %}
+				Total file sizes:
+				{{ totalFilesSize }}<br>
 			</p>
-			<p>
-			<input type="submit" class="btn btn-primary" value="Delete Files" name="submit">
-			</p>
-		</form>
-	</div>
-{% endblock %}
-
+			{% if files %}
+				<p>
+					<label>
+						<input type="checkbox" id="de-sel-files" name="de-sel-files" value="all"/>
+						<span>Select all files</span>
+					</label>
+					<ul class="de-all-files">
+						{% for file in files %}
+							<li>
+								<label>
+									<input type="checkbox" name="files[]" class="de-files" value="{{ file }}"><span>{{ file }}</span>
+								</label>&nbsp;<a href="{{ linkTo({'action': 'downloadFile', 'file': file}) }}" title="Download {{ file }}">Download</a>
+							</li>
+						{% endfor %}
+					</ul>
+				</p>
+				<p>
+					<input type="submit" class="btn btn-primary" value="Delete Files" name="submit">
+				</p>
+			{% else %}
+				<p>
+					Dir is empty.
+				</p>
+			{% endif %}
+	</form>
+</div>{% endblock %}

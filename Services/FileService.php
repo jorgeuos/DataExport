@@ -208,15 +208,27 @@ class FileService {
     }
 
     public function getFilesInBackupDir() {
-        $backupDir = $this->getBackupDir();
-        $files = scandir($backupDir);
-        if ($backupDir == $this->backupDir) {
-            $files = glob($backupDir . '*.sql');
-            $files = array_merge($files, glob($backupDir . '*.zip'));
-            $files = array_merge($files, glob($backupDir . '*.tar.gz'));
+        $path = $this->getBackupDir();
+        $ignoreFiles = ['.', '..', '.gitignore', '.DS_Store'];
+        $files = array_diff(scandir($path), $ignoreFiles);
+        $size = 0;
+        foreach ($files as $file) {
+            $size += filesize($path . $file);
         }
-        $size = self::getDirectorySize($backupDir);
-        return [$files, $size];
+        $size = $this->formatSize($size);
+        return [
+            'files' => $files,
+            'size' => $size
+        ];
     }
 
+    public  function deleteFiles($files) {
+        $path = $this->getBackupDir();
+        foreach ($files as $file) {
+            $filePath = $path . $file;
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+        }
+    }
 }
