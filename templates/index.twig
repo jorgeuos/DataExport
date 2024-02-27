@@ -99,7 +99,11 @@ WHERE visit_last_action_time >= "2024-02-24 00:00:00"
 AND visit_last_action_time <= "2024-02-24 23:59:59";
             </pre>
 		</p>
-		<form action="{{ linkTo({'action': 'selectAllVisitsAndActions'}) }}" method="post">
+		<form action="{{ linkTo({
+			'module': 'DataExport',
+			'action': 'selectAllVisitsAndActions',
+			}) }}" method="post">
+		<input type="hidden" name="idSite" value="all">
 			<p>
 				<label for="date">
 					<b>
@@ -114,22 +118,26 @@ AND visit_last_action_time <= "2024-02-24 23:59:59";
 				<button type="submit" class="btn btn-primary">Select all visits and actions: Export to CSV</button>
 			</p>
 		</form>
-		<form action="{{ linkTo({'action': 'selectAllVisitsAndActionsSiteId '}) }}" method="post">
+	</div>
+	<div vue-entry="DataExport.CsvSection">
+	</div>
+	{# <div
+        vue-entry="CoreHome.SiteSelector"
+        show-selected-site="true"
+        class="sites_autocomplete"
+    ></div> #}
+		<div vue-entry="CoreHome.ContentBlock" content-title="{{ import_title }}" rate="true">
+		<form action="{{ linkTo({'action': 'deleteFile'}) }}" method="post" enctype="multipart/form-data">
 			<p>
-				<label for="date">
-					<b>
-						Date:
-					</b>
-				</label>
+			For your performance, you can delete the database dumps.
 			</p>
 			<p>
-				<input type="date" id="date" name="date" value="" style="max-width:200px;">
+				{% for file in files %}
+				<input type="checkbox" name="file[]" value="{{ file }}">{{ file }}<br>
+				{% endfor %}
 			</p>
 			<p>
-				<input type="text" id="siteId" name="siteId" value="" style="max-width:200px;">
-			</p>
-			<p>
-				<button type="submit" class="btn btn-primary">Select all visits and actions: Export to CSV</button>
+			<input type="submit" class="btn btn-primary" value="Delete Files" name="submit">
 			</p>
 		</form>
 	</div>

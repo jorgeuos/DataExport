@@ -6,6 +6,11 @@ This plugin allows you to export the Matomo database to your local computer.
 And you can easily import the data into another Matomo instance. For example,
 you can use your real data into your development environment.
 
+I have added some features to export raw data to a CSV file.
+This is useful if you want to use the data in another tool, such as Excel, Tableau, or PowerBI.
+This is a brand new plugin and some features are very experimental,
+if you have any issues, please create an issue on GitHub.
+
 ### Caution
 
 This plugin is not designed for exporting/importing large data sets(yet). Use at your own risk.
@@ -22,6 +27,9 @@ This plugin is not designed for exporting/importing large data sets(yet). Use at
   - Drop the database
   - Cleanup old backups
   - Export queries to CSV
+- API endpoints to:
+  - Export raw data
+
 
 ## In the works
 
@@ -68,6 +76,19 @@ $ ./console scheduled-tasks:run --force "Piwik\Plugins\DataExport\Tasks.cleanBac
 To manually delete all files, you can run:
 ```bash
 $ ./console dataexport:clean-backups -f
+```
+
+## API endpoints
+
+I have started to add some API endpoints, but consider them experimental for now.  
+**CAUTION: The queries are run as live queries, so use sparingly.**
+
+Also it's not possible to generate a CSV file from the API.
+
+Example:
+```bash
+curl --request GET \
+  --url 'https://YOUR_MATOMO_URL/index.php?module=API&method=DataExport.selectAllVisitsAndActions&date=2024-02-20&idSite=1&format=json&token_auth=YOUR_ADMIN_TOKEN'
 ```
 
 
