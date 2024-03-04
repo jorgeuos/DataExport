@@ -41,6 +41,12 @@ class DbDump extends ConsoleCommand {
             'Whether to compress the dump file as a .zip or .tar.gz archive. Defaults to none.',
             'none'
         );
+        $this->addNegatableOption(
+            'sync',
+            's',
+            'Default no sync. If set, syncs the dump file to an external location. Set in your config.',
+            false
+        );
     }
 
     /**
@@ -56,10 +62,11 @@ class DbDump extends ConsoleCommand {
         // BC with API defining a protected constructor
         $logger->info('Starting db:dump command');
 
+        $fileService = new FileService($logger);
+
         $name = $input->getOption('dest');
         if (!empty($name) && dirname($name) != '.') {
             $logger->info('Creating directory: ' . dirname($name));
-            $fileService = new FileService($logger);
             try {
                 $fileService->ensure_directory_exists(dirname($name));
             } catch (\Exception $e) {
@@ -85,7 +92,13 @@ class DbDump extends ConsoleCommand {
             echo $e->getMessage();
         }
 
-        $message = sprintf('<info>DbDump: %s</info>', $name);
+        $sync = $input->getOption('sync');
+        if ($sync) {
+            $logger->info('Syncing file...');
+            $fileService->syncFile($dumpPath);
+        }
+
+        $message = sprintf('<info>DbDumped: %s</info>', basename($dumpPath));
 
         $output->writeln($message);
 

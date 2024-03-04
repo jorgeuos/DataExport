@@ -8,12 +8,15 @@
 
 namespace Piwik\Plugins\DataExport;
 
+require_once(PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php');
+
 use Piwik\Url;
 use Piwik\Piwik;
 use Piwik\Request;
 use Piwik\Notification;
 use \Piwik\Plugins\DataExport\Helpers\PHPHelper;
 use \Piwik\Plugins\DataExport\Helpers\UserHelper;
+use \Piwik\Plugins\DataExport\Helpers\SettingsHelper;
 use \Piwik\Plugins\DataExport\Services\FileService;
 use Piwik\Notification\Manager as NotificationManager;
 use \Piwik\Plugins\DataExport\Services\DatabaseDumpService;
@@ -31,7 +34,7 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
         return $this->indexHome();
     }
 
-    public function indexHome(){
+    public function indexHome() {
         $downloadPreference = UserHelper::getUserPreference('downloadPreference', 'none');
 
         $dbConfig = \Piwik\Config::getInstance()->database;
@@ -42,6 +45,8 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
         $phpSettings = PHPHelper::getPhpSettings();
         $fileService = new FileService();
         $files = $fileService->getFilesInBackupDir();
+        $settingsHelper = new SettingsHelper();
+        $settings = $settingsHelper->getDataExportSettings();
 
         // Render the Twig template templates/index.twig and assign the view variable answerToLife to the view.
         return $this->renderTemplate(
@@ -55,8 +60,12 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
                 'dbUser' => $dbUser,
                 'dbHost' => $dbHost,
                 'phpSettings' => $phpSettings,
+                'backupPath' => $settings['backupPath'],
                 'files' => $files['files'],
                 'totalFilesSize' => $files['size'],
+                'clear_backups' => Piwik::translate('DataExport_ClearBackups'),
+                'settings' => Piwik::translate('DataExport_Settings'),
+                'autoDump' => 'none',
             )
         );
     }
@@ -67,8 +76,24 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
      * @param string $filePath The path to the file to be downloaded.
      * @throws \Exception If the file does not exist or is not readable.
      */
-    protected function downloadFile($filePath) {
+    public function downloadFile($filePath = null) {
+        Piwik::checkUserHasSuperUserAccess();
         $fileService = new FileService();
+
+        if (!$filePath) {
+            $filePath = Request::fromRequest()->getStringParameter('file', '');
+        }
+
+        // Make sure the file path is not just a file name
+        if ($filePath == basename($filePath)) {
+            $filePath = $fileService->getBackupDir() . $filePath;
+        }
+
+        if (!$filePath || !file_exists($filePath) || !is_readable($filePath)) {
+            throw new \Exception("File does not exist or is not readable.");
+        }
+
+
         $fileService->downloadFile($filePath);
     }
 
@@ -202,5 +227,4 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
         $notification->context = Notification::CONTEXT_SUCCESS;
         return $this->indexHome();
     }
-
 }

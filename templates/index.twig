@@ -8,7 +8,7 @@
 		</p>
 		<p>
 			Make sure your DB user has Process tables privileges.
-			<pre>
+<pre>
 GRANT PROCESS ON {{dbName}}.* TO '{{dbUser}}'@'YOUR_HOST_OR_%';
 FLUSH PRIVILEGES;
 </pre>
@@ -88,7 +88,7 @@ FLUSH PRIVILEGES;
 			<b>Example:</b>
 			If you want to export the logs for the 24th of February 2024, you would select the date 2024-02-24.<br>
 			The Query that runs behind the scenes is:
-			<pre>
+<pre>
 SELECT *
 FROM matomo_log_visit 
 LEFT JOIN matomo_log_link_visit_action ON matomo_log_visit.idvisit = matomo_log_link_visit_action.idvisit 
@@ -97,7 +97,7 @@ LEFT JOIN matomo_log_conversion ON matomo_log_visit.idvisit = matomo_log_convers
 LEFT JOIN matomo_log_conversion_item ON matomo_log_visit.idvisit = matomo_log_conversion_item.idvisit
 WHERE visit_last_action_time >= "2024-02-24 00:00:00"
 AND visit_last_action_time <= "2024-02-24 23:59:59";
-            </pre>
+</pre>
 		</p>
 		<form action="{{ linkTo({ 'module': 'DataExport', 'action': 'selectAllVisitsAndActions', }) }}" method="post">
 			<input type="hidden" name="idSite" value="all">
@@ -116,13 +116,8 @@ AND visit_last_action_time <= "2024-02-24 23:59:59";
 			</p>
 		</form>
 	</div>
-	<div vue-entry="DataExport.CsvSection"></div>
-	{# <div
-		        vue-entry="CoreHome.SiteSelector"
-		        show-selected-site="true"
-		        class="sites_autocomplete"
-		    ></div> #}
-	<div vue-entry="CoreHome.ContentBlock" content-title="{{ import_title }}" rate="true">
+	
+	<div vue-entry="CoreHome.ContentBlock" content-title="{{ clear_backups }}" rate="true">
 		<form action="{{ linkTo({'action': 'deleteFiles'}) }}" method="post" enctype="multipart/form-data">
 			<p>
 				For your performance, you can delete the database dumps.
@@ -142,7 +137,7 @@ AND visit_last_action_time <= "2024-02-24 23:59:59";
 							<li>
 								<label>
 									<input type="checkbox" name="files[]" class="de-files" value="{{ file }}"><span>{{ file }}</span>
-								</label>&nbsp;<a href="{{ linkTo({'action': 'downloadFile', 'file': file}) }}" title="Download {{ file }}">Download</a>
+								</label>&nbsp;<a href="{{ linkTo({'action': 'downloadFile', 'file': file|url_encode }) }}" title="Download {{ file }}">Download</a>
 							</li>
 						{% endfor %}
 					</ul>
@@ -155,5 +150,11 @@ AND visit_last_action_time <= "2024-02-24 23:59:59";
 					Dir is empty.
 				</p>
 			{% endif %}
-	</form>
-</div>{% endblock %}
+		</form>
+	</div>
+
+	<div vue-entry="CoreHome.ContentBlock" content-title="{{ settings }}" rate="true">
+		Link to the settings page:
+		<a href="index.php?module=CoreAdminHome&amp;action=generalSettings&amp;idSite=1&amp;period=day&amp;date=yesterday#/DataExport" title="Settings">Settings</a>
+	</div>
+{% endblock %}

@@ -87,7 +87,6 @@ class DatabaseDumpService {
         // Set the date range for the export
         $dateStart = date('Y-m-d', strtotime($date)) . ' 00:00:00';
         $dateEnd = date('Y-m-d', strtotime($date)) . ' 23:59:59';
-        $dumpDate = date('Y-m-d', strtotime($date));
         
         try {
             $sql = 'SELECT *
@@ -129,6 +128,7 @@ class DatabaseDumpService {
         // Determine the file path
         $sites = $siteId != null && $siteId < 0 ? 'site-' . $siteId : 'all-sites';
         $now = date('Y-m-d_H-i-s', strtotime('now'));
+        $dumpDate = date('Y-m-d', strtotime($date));
         $fileName = 'dump-' . $dumpDate . '-' . $sites .'-' . $now . '.csv';
 
         $fullPath = $dumpPath ? $dumpPath : $this->backupDir . $fileName;

@@ -8,9 +8,15 @@
 
 namespace Piwik\Plugins\DataExport\Services;
 
+require_once(PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php');
+
 use Piwik\Container\StaticContainer;
 use Psr\Log\LoggerInterface;
 use Piwik\Plugins\DataExport\SystemSettings;
+use Aws\S3\S3Client;
+use Aws\S3\Exception\S3Exception;
+use \phpseclib3\Net\SFTP;
+use Piwik\Plugins\DataExport\Helpers\SettingsHelper;
 
 class FileService {
 
@@ -228,6 +234,63 @@ class FileService {
             $filePath = $path . $file;
             if (file_exists($filePath)) {
                 unlink($filePath);
+            }
+        }
+    }
+
+    public function uploadToS3($filePath, $bucketName, $key, $secret, $region) {
+        $s3 = new S3Client([
+            'version' => 'latest',
+            'region'  => $region,
+            'credentials' => [
+                'key'    => $key,
+                'secret' => $secret,
+            ],
+        ]);
+
+        try {
+            $result = $s3->putObject([
+                'Bucket' => $bucketName,
+                'Key'    => basename($filePath),
+                'Body'   => fopen($filePath, 'r'),
+                'ACL'    => 'private', // or 'public-read' based on your needs
+            ]);
+            return $result['ObjectURL']; // Returns the URL of the uploaded object
+        } catch (S3Exception $e) {
+            echo "There was an error uploading the file.\n";
+        }
+    }
+
+    public function uploadToSFTP($filePath, $server, $username, $password, $remotePath) {
+        $a = 'b';
+        $sftp = new SFTP($server);
+        if (!$sftp->login($username, $password)) {
+            exit('Login Failed');
+        }
+        if ($remotePath) {
+            $sftp->chdir($remotePath);
+        }
+        $sftp->put(basename($filePath), $filePath, SFTP::SOURCE_LOCAL_FILE);
+    }
+
+    public function syncFile($filePath) {
+        $settingsHelper = new SettingsHelper();
+        $deSettings = $settingsHelper->getDataExportSettings();
+        $syncSettings = [
+            'syncExternal' => $deSettings['syncExternal'],
+            'syncOption' => $deSettings['syncOption'],
+            'syncFilePath' => $deSettings['syncFilePath'],
+            'syncBucketName' => $deSettings['syncBucketName'],
+            'syncKey' => $deSettings['syncKey'],
+            'syncSecret' => $deSettings['syncSecret'],
+            'syncRegion' => $deSettings['syncRegion']
+        ];
+        $a = 'b';
+        if ($syncSettings['syncExternal']) {
+            if ($syncSettings['syncOption'] == 's3') {
+                return $this->uploadToS3($filePath, $syncSettings['syncBucketName'], $syncSettings['syncKey'], $syncSettings['syncSecret'], $syncSettings['syncRegion']);
+            } elseif ($syncSettings['syncOption'] == 'sftp') {
+                return $this->uploadToSFTP($filePath, $syncSettings['syncBucketName'], $syncSettings['syncKey'], $syncSettings['syncSecret'], $syncSettings['syncFilePath']);
             }
         }
     }

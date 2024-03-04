@@ -1,0 +1,14 @@
+{
+    "autoload": {
+        "psr-4": {
+            "DataExport\\": "./",
+            "DataExport\\Commands\\": "Commands/",
+            "DataExport\\Helpers\\": "Helpers/",
+            "DataExport\\Services\\": "Services/"
+        }
+    },
+    "require": {
+        "aws/aws-sdk-php": "^3.173.19",
+        "phpseclib/phpseclib": "^3.0"
+    }
+}
