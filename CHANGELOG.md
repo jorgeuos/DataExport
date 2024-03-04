@@ -22,4 +22,14 @@ Bump to a major release
 
 More is coming soon...
 
+1.1.0
+
+Added support for exporting data to a remote server
+- Feature: Sync to S3
+- Feature: Sync to SFTP
+- Feature: Finished the DB:dump Task, it had a bugs
+- Feature: Updated the README.md
+
+
+
 

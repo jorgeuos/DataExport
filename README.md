@@ -1,9 +1,11 @@
 # Matomo DataExport Plugin
 
-## Description
+### Description
 
-This plugin allows you to export the Matomo database to your local computer.
-And you can easily import the data into another Matomo instance. For example,
+This plugin allows you to **export**, **download**, **sync**, and **import** your Matomo database.
+Plus you can **export raw data** to a CSV file and much more.
+
+You can easily import the data into another Matomo instance. For example,
 you can use your real data into your development environment.
 
 I have added some features to export raw data to a CSV file.
@@ -15,13 +17,14 @@ if you have any issues, please create an issue on GitHub.
 
 This plugin is not designed for exporting/importing large data sets(yet). Use at your own risk.
 
-## Features
+### Features
 
 - Export and download the database to a file
 - Import a database from a file
 - Export and download raw data to a CSV file
 - Console commands to:
   - Dump the database
+  - Sync the database
   - Import the database
   - Create the database
   - Drop the database
@@ -30,22 +33,21 @@ This plugin is not designed for exporting/importing large data sets(yet). Use at
 - API endpoints to:
   - Export raw data
 
-
-## In the works
+### In the works
 
 We will update this plugin, probaly with paid features to connect to other
 analytics tools. Such as Snowlflake, Google BigQuery, Apache Kafka, etc.  
 Stay tuned!
 
-## Installation
+### Installation
 
 Install it via Matomo Marketplace
 
-## How to use
+### How to use
 
 Navigate to `Admin` -> `Platform` -> `Data Export` and follow the instructions.
 
-## The UI
+### The UI
 
 The UI is pretty straightforward. You can export the database, import a database, and export raw data to a CSV file.
 
@@ -53,9 +55,9 @@ The UI is pretty straightforward. You can export the database, import a database
 
 I have collected a few queries from the Matomos faq: [How do I write SQL queries...](https://matomo.org/faq/how-to/how-do-i-write-sql-queries-to-select-visitors-list-of-pageviews-searches-events-in-the-matomo-database/).
 
-## Command line
+### Command line
 
-### DB commands
+#### DB commands
 ```bash
 $ ./console db:dump
 $ ./console db:import
@@ -63,6 +65,10 @@ $ ./console db:drop
 $ ./console db:create
 
 ```
+
+### Syncing databases
+
+I have added an option to sync databases. This is useful if you want to sync your database to an external server or S3 bucket.
 
 ### Cleanup command
 
@@ -78,12 +84,12 @@ To manually delete all files, you can run:
 $ ./console dataexport:clean-backups -f
 ```
 
-## API endpoints
+### API endpoints
 
 I have started to add some API endpoints, but consider them experimental for now.  
 **CAUTION: The queries are run as live queries, so use sparingly.**
 
-Also it's not possible to generate a CSV file from the API.
+You can specify the date, idSite, and format.
 
 Example:
 ```bash
@@ -92,7 +98,7 @@ curl --request GET \
 ```
 
 
-## License
+### License
 
 GPLv3 for now.
 
