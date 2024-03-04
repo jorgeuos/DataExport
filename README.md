@@ -1,6 +1,6 @@
 # Matomo DataExport Plugin
 
-### Description
+## Description
 
 This plugin allows you to **export**, **download**, **sync**, and **import** your Matomo database.
 Plus you can **export raw data** to a CSV file and much more.
@@ -98,7 +98,7 @@ curl --request GET \
 ```
 
 
-### License
+## License
 
 GPLv3 for now.
 

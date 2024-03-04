@@ -30,6 +30,9 @@ Added support for exporting data to a remote server
 - Feature: Finished the DB:dump Task, it had a bugs
 - Feature: Updated the README.md
 
+1.1.1
+
+Trying to fix the Description in the Matomo Marketplace
 
 
 

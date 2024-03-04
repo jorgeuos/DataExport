@@ -4,15 +4,40 @@
 
 ## Description
 
-This plugin allows you to export the Matomo database to your local computer.
-And you can easily import the data into another Matomo instance. For example,
+This plugin allows you to **export**, **download**, **sync**, and **import** your Matomo database.
+Plus you can **export raw data** to a CSV file and much more.
+
+You can easily import the data into another Matomo instance. For example,
 you can use your real data into your development environment.
 
-![Screenshot of the plugin](https://plugins.matomo.org/DataExport/images/0.1.0/1-Default-view.png?w=1024)
+I have added some features to export raw data to a CSV file.
+This is useful if you want to use the data in another tool, such as Excel, Tableau, or PowerBI.
+This is a brand new plugin and some features are very experimental,
+if you have any issues, please create an issue on GitHub.
+
+![Screenshot of the plugin](https://plugins.matomo.org/DataExport/images/1.1.1/1-Default-view.png?w=1024)
+![Screenshot of the plugin](https://plugins.matomo.org/DataExport/images/1.1.1/2-Default-view.png?w=1024)
+![Screenshot of the plugin](https://plugins.matomo.org/DataExport/images/1.1.1/3-Settings-page.png?w=1024)
 
 ### Caution
 
 This plugin is not designed for exporting/importing large data sets(yet).
+
+### Features
+
+- Export and download the database to a file
+- Import a database from a file
+- Export and download raw data to a CSV file
+- Console commands to:
+  - Dump the database
+  - Sync the database
+  - Import the database
+  - Create the database
+  - Drop the database
+  - Cleanup old backups
+  - Export queries to CSV
+- API endpoints to:
+  - Export raw data
 
 ## In the works
 
