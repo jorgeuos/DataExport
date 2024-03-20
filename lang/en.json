@@ -39,6 +39,7 @@
         "SyncNone": "none",
         "SyncCompressionZip": "zip",
         "SyncCompressionTarGz": "tar.gz",
-        "SyncCompressionDesc": "Select the compression type for the backup files."
+        "SyncCompressionDesc": "Select the compression type for the backup files.",
+        "CsvCardTitle": "CSV Export - Select all visits and actions by {siteId}"
     }
 }

@@ -196,6 +196,9 @@ class FileService {
      */
     public function getDirectorySize($dir) {
         $size = 0;
+        if (!is_dir($dir)) {
+            return 0;
+        }
         $files = scandir($dir);
 
         foreach ($files as $file) {
@@ -215,6 +218,14 @@ class FileService {
 
     public function getFilesInBackupDir() {
         $path = $this->getBackupDir();
+        // Fix error when the directory doesn't exist
+        // https://github.com/jorgeuos/DataExport/issues/2
+        if (!is_dir($path)) {
+            return [
+                'files' => [],
+                'size' => 0
+            ];
+        }
         $ignoreFiles = ['.', '..', '.gitignore', '.DS_Store'];
         $files = array_diff(scandir($path), $ignoreFiles);
         $size = 0;

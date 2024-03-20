@@ -12,6 +12,9 @@ function deSelectAllFiles() {
 
 document.addEventListener('DOMContentLoaded', function() {
   const mainCheck = document.getElementById('de-sel-files');
+  if (!mainCheck) {
+    return;
+  }
   const fileCheckboxes = document.querySelectorAll('.de-all-files input[type="checkbox"]');
   // Event listener for the "Select all" checkbox
   mainCheck.addEventListener('change', function() {

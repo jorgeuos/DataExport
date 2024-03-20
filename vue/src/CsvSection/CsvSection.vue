@@ -8,18 +8,19 @@
 <template>
   <div class="card">
     <div class="card-content">
-      <h2 class="card-title">CSV Export - Select all visits and actions by siteId</h2>
+      <h2 class="card-title">{{ translate('DataExport_CsvCardTitle') }}</h2>
 
       <div>
         <p>
-          <label for="csvSite">Select a site: <span v-bind="this.selectedSite">
-            {{ selectedSite }}</span></label><br>
+          <label for="csvSite">Select a site: <span v-bind="this.site">
+            {{ site }}</span></label><br>
         </p>
         <p>
           <SiteSelector id="csvSite" v-model="site" :show-all-sites-item="false"
             :switch-site-on-select="false"
             :show-selected-site="true"
-            @update:model-value="selectedSite = $event; websiteChanged()"
+            :default-to-first-site="true"
+            @update:model-value="site = $event; websiteChanged()"
             ></SiteSelector>
         </p>
         <p>
@@ -77,21 +78,8 @@ import {
   SiteRef,
   Site,
   Matomo,
-} from 'CoreHome';
-import { SaveButton } from 'CorePluginsAdmin';
-
-declare global {
-  interface Window {
-    // eslint-disable-next-line
-    piwik: any;
-  }
-}
-
-// interface Site {
-//   idsite: number;
-//   name: string;
-// }
-// site: SiteRef;
+} from '../../../../CoreHome/vue/src/index.ts';
+// } from 'CoreHome';
 
 interface CsvSectionState {
   isLoading: boolean;
@@ -99,15 +87,20 @@ interface CsvSectionState {
   showDialog: boolean;
   idSite: string | number;
   siteName: string;
-  site: Record<string, string>;
+  site: SiteRef;
   sites: Record<string, Site>;
-  selectedSite: string | number | string[] | undefined;
   tokenAuth: string;
   login: string;
   date: string;
 }
 
 export default defineComponent({
+  props: {
+    defaultSite: {
+      type: Object,
+      required: true,
+    },
+  },
   components: {
     MatomoDialog,
     SiteSelector,
@@ -121,7 +114,6 @@ export default defineComponent({
       siteName: '',
       site: this.defaultSite as SiteRef,
       sites: {},
-      selectedSite: '',
       tokenAuth: '', // Placeholder for the token_auth
       login: '',
       date: '',
@@ -139,6 +131,7 @@ export default defineComponent({
     });
 
     return {
+      translate,
       getSites() {
         return sitesPromise;
       },
@@ -146,34 +139,24 @@ export default defineComponent({
   },
   methods: {
     downloadCSV() {
-      console.log('Download CSV for site ID:', this.selectedSite);
+      console.log('Download CSV for site ID:', this.site);
       console.log('Date:', this.date);
 
-      if (!this.selectedSite) {
+      if (!this.site) {
         console.error('Site ID is undefined or not selected.');
         return;
       }
       const redirectParams = {
         module: 'DataExport',
         action: 'selectAllVisitsAndActions',
-        idSite: this.selectedSite.id,
+        idSite: this.site.id,
         date: this.date,
       };
       // Redirect because download is not possible with ajax
       Matomo.helper.redirect(redirectParams);
-      // selectAllVisitsAndActions
-
-      // AjaxHelper.post({
-      //   module: 'API',
-      //   method: 'DataExport.selectAllVisitsAndActions',
-      //   idSite: this.selectedSite.id,
-      //   date: this.date,
-      // }).then((response) => {
-      //   console.log('Response:', response);
-      // });
     },
     websiteChanged() {
-      console.log('websiteChanged this.selectedSite:', this.selectedSite);
+      console.log('websiteChanged this.site:', this.site);
       console.log('websiteChanged this.site:', this.site);
     },
     dateChanged() {

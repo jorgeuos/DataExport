@@ -116,6 +116,9 @@ AND visit_last_action_time <= "2024-02-24 23:59:59";
 			</p>
 		</form>
 	</div>
+
+	<div vue-entry="DataExport.CsvSection">
+	</div>
 	
 	<div vue-entry="CoreHome.ContentBlock" content-title="{{ clear_backups }}" rate="true">
 		<form action="{{ linkTo({'action': 'deleteFiles'}) }}" method="post" enctype="multipart/form-data">

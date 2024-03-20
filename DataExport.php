@@ -18,11 +18,18 @@ class DataExport extends \Piwik\Plugin {
     public function registerEvents() {
         return [
             'AssetManager.getJavaScriptFiles' => 'getJavaScriptFiles',
+            'Translate.getClientSideTranslationKeys' => 'getClientSideTranslationKeys',
         ];
     }
 
     public function getJavaScriptFiles(&$jsFiles) {
         $jsFiles[] = 'plugins/DataExport/javascripts/data-export.js';
+    }
+
+
+    public function getClientSideTranslationKeys(&$result)
+    {
+        $result[] = 'DataExport_CsvCardTitle';
     }
 
 }
