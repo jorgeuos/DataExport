@@ -34,5 +34,9 @@ Added support for exporting data to a remote server
 
 Trying to fix the Description in the Matomo Marketplace
 
+1.1.2
+
+- Fixed Bug when dir is empty
+- Added translations for the client side
 
 

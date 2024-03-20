@@ -9,5 +9,5 @@ Follow these steps.
 5. Update the version number in the `DataExport.php` file.
 6. Commit the changes.
 7. Push the changes to the repository.
-8. Create a new release in the repository.
+8. Create a new release in the repository, with the same version number as in the `plugin.json`.
 9. Wait for the release to be published in the Marketplace.
