@@ -45,4 +45,8 @@ Trying to fix the Description in the Matomo Marketplace
 - Added more checks for the export folder
 Ran into the the same bug again
 
+1.1.4
+
+- Removed filter_var for compressions, allow multiple compressions
+
 
