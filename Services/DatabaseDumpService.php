@@ -36,13 +36,18 @@ class DatabaseDumpService {
     protected $db;
 
     /**
+     * $var \Piwik\Plugins\DataExport\Services\FileService
+     */
+    protected $fileService;
+
+    /**
      * Constructor.
      */
     public function __construct(LoggerInterface $logger = null) {
         $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
         $this->dbConfig = \Piwik\Config::getInstance()->database;
-        $fileService = new FileService();
-        $this->backupDir = $fileService->getBackupDir();
+        $this->fileService = new FileService();
+        $this->backupDir = $this->fileService->getBackupDir();
         $this->db = Db::get();
     }
 
@@ -56,7 +61,11 @@ class DatabaseDumpService {
         $dbPassword = $dbConfig['password'];
         $dbHost = $dbConfig['host'];
 
-        $fileService = new FileService();
+        // Make sure the backup directory exists
+        if(!$this->fileService->ensure_directory_exists($this->backupDir)) {
+            throw new \Exception("Failed to create backup directory.");
+        }
+
         $fullPath = $this->backupDir . 'dbdump-' . date('Y-m-d_H-i-s') . '.sql';
         if ($dumpPath) {
             $fullPath = $dumpPath;
@@ -78,7 +87,7 @@ class DatabaseDumpService {
             throw new \Exception("Failed to generate database dump.");
         }
 
-        $fullPath = $fileService->compressDump($fullPath, $downloadPreference);
+        $fullPath = $this->fileService->compressDump($fullPath, $downloadPreference);
 
         return $fullPath;
     }

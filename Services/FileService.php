@@ -71,11 +71,26 @@ class FileService {
 
     public function ensure_directory_exists(string $dir) {
         $this->logger->debug('Ensuring directory exists: ' . $dir);
+        
         if (!is_dir($dir)) {
-            $this->logger->debug('No dir, creating directory: ' . $dir);
-            return mkdir($dir, 0755, true);
+            $this->logger->debug('No dir, attempting to create directory: ' . $dir);
+            // Try to create the directory.
+            if (!mkdir($dir, 0755, true)) {
+                // If mkdir fails, log an error and return a message.
+                $error = error_get_last();
+                $errorMessage = 'Cannot generate backup folder: ' . $dir . '. Error: ' . $error['message'];
+                $this->logger->error($errorMessage);
+                return $errorMessage;
+            } else {
+                // Successfully created the directory.
+                $this->logger->debug('Successfully created directory: ' . $dir);
+                return true;
+            }
+        } else {
+            // Directory already exists.
+            $this->logger->debug('Directory already exists: ' . $dir);
+            return true;
         }
-        return true;
     }
 
     public function is_full_path(string $dumpPath) {

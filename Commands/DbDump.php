@@ -70,7 +70,9 @@ class DbDump extends ConsoleCommand {
             try {
                 $fileService->ensure_directory_exists(dirname($name));
             } catch (\Exception $e) {
+                $logger->error('Failed to create directory: ' . dirname($name));
                 $logger->error($e->getMessage());
+                return self::FAILURE;
             }
         }
         $logger->info('Destination: ' . $name);
@@ -89,7 +91,9 @@ class DbDump extends ConsoleCommand {
             $dumpPath = $service->generateDump($compress, $name);
             $logger->info('Dump generated at: ' . $dumpPath);
         } catch (\Exception $e) {
-            echo $e->getMessage();
+            $logger->error('Failed to generate dump');
+            $logger->error($e->getMessage());
+            return self::FAILURE;
         }
 
         $sync = $input->getOption('sync');
