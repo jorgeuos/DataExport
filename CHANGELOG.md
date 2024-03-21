@@ -40,3 +40,9 @@ Trying to fix the Description in the Matomo Marketplace
 - Added translations for the client side
 
 
+1.1.3
+
+- Added more checks for the export folder
+Ran into the the same bug again
+
+
