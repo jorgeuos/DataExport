@@ -82,9 +82,7 @@ class DbDump extends ConsoleCommand {
             $logger->error('Please specify a compression format: none, zip, or tar.gz');
             return self::FAILURE;
         }
-        $logger->info('Compress: ' . $compress);
-
-        $compress = filter_var($compress, FILTER_VALIDATE_BOOLEAN);
+        $logger->debug('Compress: ' . $compress);
 
         try {
             $service = new DatabaseDumpService();
