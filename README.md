@@ -89,6 +89,7 @@ You can try to add the verbose flag `-vvv` for more log messages. If you encount
 
 Just make sure you have added all the needed configuration settings in the UI or in your `config.ini.php` file.
 
+
 ### Configuration
 
 You can configure in the UI or add the following settings to your `config.ini.php` file:
@@ -153,6 +154,9 @@ curl --request GET \
   --url 'https://YOUR_MATOMO_URL/index.php?module=API&method=DataExport.selectAllVisitsAndActions&date=2024-02-20&idSite=1&format=json&token_auth=YOUR_ADMIN_TOKEN'
 ```
 
+### Support
+
+If you need help with exporting raw logs to a data warehouse, such as Snowflake, Google BigQuery, or Apache Kafka, contact me for a quote at [hey@jorgeuos.com](hey@jorgeuos.com).
 
 ## License
 
