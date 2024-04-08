@@ -70,6 +70,62 @@ $ ./console db:create
 
 I have added an option to sync databases. This is useful if you want to sync your database to an external server or S3 bucket.
 
+You need to configure the destination in: `Admin(Cog wheel)` --> `System` --> `General settings` --> `Data Export`
+
+And Select the Checkbox, `Sync File to External Server`.
+
+Fill in all the required settings.
+![Screenshot 2024-04-08 at 13 07 41](https://github.com/jorgeuos/DataExport/assets/21176316/8f032996-863f-4d10-8c4d-f2bf7e159fa2)
+
+
+Then it should sync every time a new dump is generated with the `scheduled-tasks`, if you have set up a `./console core:archive`-job, you don't necessarily need to run it manually, It will automatically run when the `core:archive` process runs, one exception is if you added the `--disable-scheduled-tasks` flag to the command.
+
+You can also test the settings by running the following command:
+```sh
+$ ./console scheduled-tasks:run "Piwik\Plugins\DataExport\Tasks.databaseDumpTask"
+```
+
+You can try to add the verbose flag `-vvv` for more log messages. If you encounter any bugs or issues, just create a new issue and I will try to fix it as soon as possible.
+
+Just make sure you have added all the needed configuration settings in the UI or in your `config.ini.php` file.
+
+### Configuration
+
+You can configure in the UI or add the following settings to your `config.ini.php` file:
+```ini
+[DataExport]
+; dataExportBackupPath:
+; Path to store the backups on the Matomo server
+dataExportBackupPath = ""
+; dataExportAutoDump:
+; available options: "none", "daily", "weekly"
+dataExportAutoDump = "none"
+; dataExportAutoDumpCompression:
+; available options: "none", "zip", "tar"
+dataExportAutoDumpCompression = "none"
+; dataExportSyncExternal:
+; 1 for true, 0 for false
+dataExportSyncExternal = 0
+; dataExportSyncOption:
+; or "sftp"
+dataExportSyncOption = "s3"
+; dataExportSyncFilePath:
+; Path for s3 or Remote Path for sftp
+dataExportSyncFilePath = ""
+; dataExportSyncBucketName:
+; for s3 or Hostname for sftp
+dataExportSyncBucketName = ""
+; dataExportSyncKey:
+; Access Key for s3 or Username for sftp
+dataExportSyncKey = ""
+; dataExportSyncSecret:
+; Secret Key for s3 or Password for sftp
+dataExportSyncSecret = ""
+; dataExportSyncRegion:
+; Region for s3
+dataExportSyncRegion = ""
+```
+
 ### Cleanup command
 
 Downloading files from the UI will generate a copy that stays on the server.
