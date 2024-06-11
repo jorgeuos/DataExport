@@ -53,6 +53,23 @@ Install it via Matomo Marketplace
 
 Navigate to `Admin` -> `Platform` => `Data Export` and follow the instructions.
 
+## Configuration
+
+Example of the configuration file:
+```ini
+[DataExport]
+dataExportBackupPath = ""
+dataExportAutoDump = "daily"
+dataExportAutoDumpCompression = "zip"
+dataExportSyncExternal = 1
+dataExportSyncOption = "sftp"
+dataExportSyncFilePath = "/home/YOUR_USER/backups"
+dataExportSyncBucketName = "192.168.0.1"
+dataExportSyncKey = "USERNAME"
+dataExportSyncSecret = "YOUR_PASSWORD"
+dataExportSyncRegion = ""
+```
+
 ## License
 
 GPLv3 for now.
