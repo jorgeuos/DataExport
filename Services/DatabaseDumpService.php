@@ -1,4 +1,5 @@
 <?php
+
 /**
  * © 2024 Jorge Powers. All rights reserved.
  *
@@ -8,10 +9,13 @@
 
 namespace Piwik\Plugins\DataExport\Services;
 
+use COM;
 use Piwik\Plugins\DataExport\Services\FileService;
 use Piwik\Container\StaticContainer;
 use Psr\Log\LoggerInterface;
 use Piwik\Db;
+use Piwik\Common;
+use Piwik\Date;
 
 class DatabaseDumpService {
 
@@ -19,6 +23,11 @@ class DatabaseDumpService {
      * @var array
      */
     protected $dbConfig;
+
+    /**
+     * @var array
+     */
+    protected $dbReaderConfig;
 
     /**
      * @var string
@@ -46,23 +55,32 @@ class DatabaseDumpService {
     public function __construct(LoggerInterface $logger = null) {
         $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
         $this->dbConfig = \Piwik\Config::getInstance()->database;
+        $this->dbReaderConfig = \Piwik\Config::getInstance()->database_reader;
         $this->fileService = new FileService();
         $this->backupDir = $this->fileService->getBackupDir();
         $this->db = Db::get();
+    }
+
+    private function getDbConfig() {
+        if (empty($this->dbReaderConfig['host'])) {
+            return $this->dbConfig;
+        }
+        $this->logger->debug('Using read-only database configuration.');
+        return $this->dbReaderConfig;
     }
 
     public function generateDump($downloadPreference = 'none', $dumpPath = null) {
         $this->logger->debug('Generating database dump...');
         $this->logger->debug('Download preference: ' . $downloadPreference);
         $this->logger->debug('Dump path: ' . $dumpPath);
-        $dbConfig = $this->dbConfig;
+        $dbConfig = $this->getDbConfig();
         $dbName = $dbConfig['dbname'];
         $dbUser = $dbConfig['username'];
         $dbPassword = $dbConfig['password'];
         $dbHost = $dbConfig['host'];
 
         // Make sure the backup directory exists
-        if(!$this->fileService->ensure_directory_exists($this->backupDir)) {
+        if (!$this->fileService->ensure_directory_exists($this->backupDir)) {
             throw new \Exception("Failed to create backup directory.");
         }
 
@@ -92,11 +110,119 @@ class DatabaseDumpService {
         return $fullPath;
     }
 
-    public function selectAllVisitsAndActionsData($date = 'yesterday', $siteId = null){
+    public function getLogActionMinId($date){
+        $startDate = Date::factory($date, null)->setTime('00:00:00')->toString('Y-m-d H:i:s');
+        $endDate = Date::factory($date, null)->setTime('23:59:59')->toString('Y-m-d H:i:s');
+
+        $sql = "SELECT MIN(idaction_url) AS min_idaction
+            FROM matomo_log_link_visit_action
+            WHERE server_time >= '" . $startDate . "'
+            AND server_time < '" . $endDate . "';";
+        $minId = $this->db->fetchOne($sql);
+        return $minId;
+    }
+
+
+    public function generateLogDumps($downloadPreference = 'none', $dumpPath = null, $tables = null, $date = null, $siteIds = null) {
+        $this->logger->debug('Generating database dump...');
+        $this->logger->debug('Download preference: ' . $downloadPreference);
+        $this->logger->debug('Dump path: ' . $dumpPath);
+        $this->logger->debug('Tables: ' . $tables);
+        $this->logger->debug('Date: ' . $date);
+        $this->logger->debug('Site IDs: ' . $siteIds);
+    
+        $dbConfig = $this->getDbConfig();
+        $dbName = $dbConfig['dbname'];
+        $dbUser = $dbConfig['username'];
+        $dbPassword = $dbConfig['password'];
+        $dbHost = $dbConfig['host'];
+    
+        // Make sure the backup directory exists
+        if (!$this->fileService->ensure_directory_exists($this->backupDir)) {
+            throw new \Exception("Failed to create backup directory.");
+        }
+    
+        $tablesArray = explode(',', $tables);
+    
+        $dumpCommands = [];
+        foreach ($tablesArray as $i => $table) {
+            $table = trim($table);
+            $table = Common::prefixTable($table);
+
+            // Handle other tables with direct date and site ID filtering
+            $whereCondition = [];
+            if (in_array($table, [Common::prefixTable('log_visit')])) {
+                $dateTimeCol = 'visit_first_action_time';
+            } elseif (in_array($table, [Common::prefixTable('log_link_visit_action'), Common::prefixTable('log_conversion'), Common::prefixTable('log_conversion_item')])) {
+                $dateTimeCol = 'server_time';
+            } else {
+                $dateTimeCol = null;
+            }
+
+            if ($dateTimeCol) {
+                if ($date) {
+                    $whereCondition[] = sprintf("%s BETWEEN '%s 00:00:00' AND '%s 23:59:59'", $dateTimeCol, $date, $date);
+                }
+                if ($siteIds) {
+                    $whereCondition[] = 'idsite IN (' . $siteIds . ')';
+                }
+                $whereClause = implode(' AND ', $whereCondition);
+                $whereCondition = $whereClause ? '--where="' . $whereClause . '"' : '';
+            }
+
+            // Handle log_action separately due to lack of date columns
+            // Query the first idaction_url from matomo_log_link_visit_action
+            // that we can use as a filter for matomo_log_action
+            if ($table == Common::prefixTable('log_action')) {
+                $minId = $this->getLogActionMinId($date);
+                $whereCondition = $minId ? '--where="idaction > ' . $minId . '"' : '';
+            }
+
+            $fullPath = $this->backupDir . $table . '-' . date('Y-m-d_H-i') . '.sql';
+            if ($dumpPath) {
+                $fullPath = $dumpPath;
+            }
+
+            // Example:
+            // mysqldump --skip-add-drop-table -u root -h localhost matomo matomo_log_action --where="idaction > 123" >> /path/to/dump.sql
+            $command = sprintf(
+                'mysqldump --skip-add-drop-table -u %s -h%s %s %s %s >> %s',
+                escapeshellarg($dbUser),
+                escapeshellarg($dbHost),
+                escapeshellarg($dbName),
+                escapeshellarg($table),
+                $whereCondition,
+                escapeshellarg($fullPath)
+            );
+            $dumpCommands[] = $command;
+            $this->logger->debug('Dump command: ' . $command);
+        }
+    
+        putenv('MYSQL_PWD=' . $dbPassword);
+        foreach ($dumpCommands as $command) {
+            exec($command, $output, $returnVar);
+            if ($returnVar !== 0) {
+                putenv('MYSQL_PWD');
+                throw new \Exception("Failed to generate database dump for command: $command.");
+            }
+        }
+        putenv('MYSQL_PWD');
+    
+        if ($returnVar !== 0) {
+            throw new \Exception("Failed to generate database dump.");
+        }
+    
+        $fullPath = $this->fileService->compressDump($fullPath, $downloadPreference);
+    
+        return $fullPath;
+    }
+
+
+    public function selectAllVisitsAndActionsData($date = 'yesterday', $siteId = null) {
         // Set the date range for the export
         $dateStart = date('Y-m-d', strtotime($date)) . ' 00:00:00';
         $dateEnd = date('Y-m-d', strtotime($date)) . ' 23:59:59';
-        
+
         try {
             $sql = 'SELECT *
                     FROM matomo_log_visit AS mlv
@@ -112,7 +238,7 @@ class DatabaseDumpService {
             }
             $sql .= ';';
 
-            
+
             $this->logger->debug('SQL: ' . $sql);
             // Use parameterized query for security and flexibility
             $data = $this->db->fetchAll($sql);
@@ -138,7 +264,7 @@ class DatabaseDumpService {
         $sites = $siteId != null && $siteId < 0 ? 'site-' . $siteId : 'all-sites';
         $now = date('Y-m-d_H-i-s', strtotime('now'));
         $dumpDate = date('Y-m-d', strtotime($date));
-        $fileName = 'dump-' . $dumpDate . '-' . $sites .'-' . $now . '.csv';
+        $fileName = 'dump-' . $dumpDate . '-' . $sites . '-' . $now . '.csv';
 
         $fullPath = $dumpPath ? $dumpPath : $this->backupDir . $fileName;
 

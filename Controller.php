@@ -8,8 +8,6 @@
 
 namespace Piwik\Plugins\DataExport;
 
-require_once(PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php');
-
 use Piwik\Url;
 use Piwik\Piwik;
 use Piwik\Request;
@@ -29,6 +27,13 @@ use \Piwik\Plugins\DataExport\Services\DatabaseImportService;
  * http://developer.piwik.org/api-reference/Piwik/View
  */
 class Controller extends \Piwik\Plugin\ControllerAdmin {
+
+    public function __construct()
+    {
+        if (file_exists(PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php')) {
+            require_once PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php';
+        }
+    }
 
     public function index() {
         return $this->indexHome();

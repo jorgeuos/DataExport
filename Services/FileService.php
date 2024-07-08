@@ -39,6 +39,9 @@ class FileService {
         $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
         $this->backupDir = PIWIK_USER_PATH . '/tmp/de_backups/';
         $this->settings = new SystemSettings();
+        if (file_exists(PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php')) {
+            require_once PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php';
+        }
     }
 
     private function zipDump(string $dumpPath) {
