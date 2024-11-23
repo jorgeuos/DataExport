@@ -191,6 +191,11 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
         Piwik::checkUserHasSuperUserAccess();
 
         $siteId = Request::fromRequest()->getIntegerParameter('idSite', 0);
+
+        // Because Matomo adds siteId to the URL, we need to check if it's for all sites
+        $getAll = Request::fromRequest()->getIntegerParameter('getAll', 0);
+        $siteId = $getAll !== 1 ? $siteId : 'all';
+
         $date = Request::fromPost()->getStringParameter('date', 'yesterday');
         if (!$date || $date == 'yesterday') {
             $date = Request::fromRequest()->getStringParameter('date', 'yesterday');

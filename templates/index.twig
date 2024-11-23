@@ -100,7 +100,8 @@ AND visit_last_action_time <= "2024-02-24 23:59:59";
 </pre>
 		</p>
 		<form action="{{ linkTo({ 'module': 'DataExport', 'action': 'selectAllVisitsAndActions', }) }}" method="post">
-			<input type="hidden" name="idSite" value="all">
+			<input type="hidden" name="idSite" value="0">
+			<input type="hidden" name="getAll" value="1">
 			<p>
 				<label for="date">
 					<b>

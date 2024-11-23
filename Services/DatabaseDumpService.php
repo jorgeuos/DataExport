@@ -110,15 +110,26 @@ class DatabaseDumpService {
         return $fullPath;
     }
 
-    public function getLogActionMinId($date){
+    /**
+     * Get the minimum idaction_url from matomo_log_link_visit_action for a given date.
+     */
+    public function getLogActionMinId($date) {
+        // Prepare start and end dates with proper formatting
         $startDate = Date::factory($date, null)->setTime('00:00:00')->toString('Y-m-d H:i:s');
         $endDate = Date::factory($date, null)->setTime('23:59:59')->toString('Y-m-d H:i:s');
 
+        // SQL query with positional parameters
         $sql = "SELECT MIN(idaction_url) AS min_idaction
-            FROM matomo_log_link_visit_action
-            WHERE server_time >= '" . $startDate . "'
-            AND server_time < '" . $endDate . "';";
-        $minId = $this->db->fetchOne($sql);
+                FROM matomo_log_link_visit_action
+                WHERE server_time >= ?
+                AND server_time < ?";
+
+        // Provide parameters in the correct order
+        $parameters = [$startDate, $endDate];
+
+        // Execute query and fetch the result
+        $minId = $this->db->fetchOne($sql, $parameters);
+
         return $minId;
     }
 
@@ -217,33 +228,46 @@ class DatabaseDumpService {
         return $fullPath;
     }
 
-
+    /**
+     * Select all visits and actions data for a given date range.
+     *
+     * It's likely that there's a subtle quirk in how Matomo’s DB abstraction processes named parameters.
+     * Hence, the use of positional parameters in the query.
+     */
     public function selectAllVisitsAndActionsData($date = 'yesterday', $siteId = null) {
         // Set the date range for the export
         $dateStart = date('Y-m-d', strtotime($date)) . ' 00:00:00';
         $dateEnd = date('Y-m-d', strtotime($date)) . ' 23:59:59';
 
         try {
-            $sql = 'SELECT *
+            // Base SQL query with placeholders
+            $sql = 'SELECT * 
                     FROM matomo_log_visit AS mlv
                     LEFT JOIN matomo_log_link_visit_action ON mlv.idvisit = matomo_log_link_visit_action.idvisit 
                     LEFT JOIN matomo_log_action ON matomo_log_action.idaction = matomo_log_link_visit_action.idaction_url 
                     LEFT JOIN matomo_log_conversion ON mlv.idvisit = matomo_log_conversion.idvisit 
                     LEFT JOIN matomo_log_conversion_item ON mlv.idvisit = matomo_log_conversion_item.idvisit
-                    WHERE visit_last_action_time >= "' . $dateStart . '"
-                    AND visit_last_action_time <= "' . $dateEnd . '"
-                    ';
+                    WHERE visit_last_action_time >= ?
+                    AND visit_last_action_time <= ?';
+
+            // Add conditionally for siteId
+            $parameters = [
+                $dateStart,
+                $dateEnd,
+            ];
+
             if ($siteId && $siteId > 0 && $siteId != 'all') {
-                $sql .= ' AND mlv.idsite = ' . $siteId;
+                $sql .= ' AND mlv.idsite = ?';
+                $parameters[] = $siteId;
             }
-            $sql .= ';';
 
+            $this->logger->debug('SQL: ' . $sql . ' | Parameters: ' . json_encode($parameters));
 
-            $this->logger->debug('SQL: ' . $sql);
-            // Use parameterized query for security and flexibility
-            $data = $this->db->fetchAll($sql);
+            // Use a prepared statement with parameterized values
+            $data = $this->db->fetchAll($sql, $parameters);
         } catch (\Exception $e) {
-            $this->logger->error('Error exporting data to CSV: ' . $e->getMessage());
+            $msg = $e->getMessage();
+            $this->logger->error('Error exporting data to CSV: ' . $msg);
             return false;
         }
         return $data;
@@ -261,7 +285,7 @@ class DatabaseDumpService {
         }
 
         // Determine the file path
-        $sites = $siteId != null && $siteId < 0 ? 'site-' . $siteId : 'all-sites';
+        $sites = $siteId != null && $siteId > 0 ? 'site-' . $siteId : 'all-sites';
         $now = date('Y-m-d_H-i-s', strtotime('now'));
         $dumpDate = date('Y-m-d', strtotime($date));
         $fileName = 'dump-' . $dumpDate . '-' . $sites . '-' . $now . '.csv';
