@@ -34,11 +34,10 @@ class Tasks extends \Piwik\Plugin\Tasks
     {
         $this->daily('cleanBackupsFolderTask', null, self::LOWEST_PRIORITY);
 
-        if ($this->settings->dataExportAutoDump->getValue() === 'daily') {
-            $this->daily('databaseDumpTask', null, self::NORMAL_PRIORITY);
-        } elseif ($this->settings->dataExportAutoDump->getValue() === 'weekly') {
-            $this->weekly('databaseDumpTask', null, self::NORMAL_PRIORITY);
-        }
+        $this->daily('databaseDumpTask', null, self::NORMAL_PRIORITY);
+
+        $this->weekly('databaseDumpTask', null, self::NORMAL_PRIORITY);
+
     }
 
     public function cleanBackupsFolderTask($force = null)
@@ -47,9 +46,8 @@ class Tasks extends \Piwik\Plugin\Tasks
         $fileService->cleanBackupsFolder($force);
     }
 
-    public function databaseDumpTask()
+    private function runDatabaseDump()
     {
-        $this->logger->info('Starting database dump task');
         $service = new DatabaseDumpService();
         $compress = $this->settings->dataExportAutoDumpCompression->getValue();
         $dumpPath = $service->generateDump($compress, null);
@@ -60,6 +58,18 @@ class Tasks extends \Piwik\Plugin\Tasks
             $fileService->syncFile($dumpPath);
         }
         $this->logger->info('Dump generated at: ' . $dumpPath);
+    }
+
+    public function databaseDumpTask()
+    {
+        $this->logger->info('Starting database dump task');
+        if ($this->settings->dataExportAutoDump->getValue() === 'daily') {
+            $this->logger->info('Daily database dump task');
+            $this->runDatabaseDump();
+        } elseif ($this->settings->dataExportAutoDump->getValue() === 'weekly') {
+            $this->logger->info('Weekly database dump task');
+            $this->runDatabaseDump();
+        }
     }
 
 }

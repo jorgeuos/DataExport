@@ -15,11 +15,20 @@
 namespace Piwik\Plugins\DataExport;
 
 class DataExport extends \Piwik\Plugin {
+
     public function registerEvents() {
         return [
+            'init' => [$this, 'onInit'],
             'AssetManager.getJavaScriptFiles' => 'getJavaScriptFiles',
             'Translate.getClientSideTranslationKeys' => 'getClientSideTranslationKeys',
         ];
+    }
+    
+    public function onInit()
+    {
+        if (file_exists(PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php')) {
+            require_once PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php';
+        }
     }
 
     public function getJavaScriptFiles(&$jsFiles) {

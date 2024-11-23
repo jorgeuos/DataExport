@@ -28,13 +28,6 @@ use \Piwik\Plugins\DataExport\Services\DatabaseImportService;
  */
 class Controller extends \Piwik\Plugin\ControllerAdmin {
 
-    public function __construct()
-    {
-        if (file_exists(PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php')) {
-            require_once PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php';
-        }
-    }
-
     public function index() {
         return $this->indexHome();
     }
