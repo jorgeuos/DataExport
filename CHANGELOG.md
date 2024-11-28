@@ -1,5 +1,18 @@
 ## Changelog
 
+1.1.8
+- Added directory check for the export folder for the CSV export
+
+1.1.7
+- Changed to positional statements
+- Solved CSV naming bug
+- Added extra logic to get allSites in CSV
+
+
+1.1.6
+- Fixed databaseDumpTask runner
+
+
 1.1.5
 
 - Fixed compression bug
