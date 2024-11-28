@@ -277,6 +277,11 @@ class DatabaseDumpService {
         $this->logger->info('Exporting database to CSV...');
         $this->logger->info('Dump path: ' . $dumpPath);
 
+        // Make sure the backup directory exists
+        if (!$this->fileService->ensure_directory_exists($this->backupDir)) {
+            throw new \Exception("Failed to create backup directory.");
+        }
+
         // Get the data
         $data = $this->selectAllVisitsAndActionsData($date, $siteId);
         if (empty($data)) {
