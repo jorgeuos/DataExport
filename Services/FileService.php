@@ -8,7 +8,9 @@
 
 namespace Piwik\Plugins\DataExport\Services;
 
-require_once(PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php');
+// WP handles file paths differently than PIWIK_INCLUDE_PATH
+// Check in constructor if the file exists and require it
+// require_once __DIR__ . '/../vendor/autoload.php';
 
 use Piwik\Container\StaticContainer;
 use Psr\Log\LoggerInterface;
@@ -39,8 +41,10 @@ class FileService {
         $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
         $this->backupDir = PIWIK_USER_PATH . '/tmp/de_backups/';
         $this->settings = new SystemSettings();
-        if (file_exists(PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php')) {
-            require_once PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php';
+        if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+            // WP handles file paths differently than PIWIK_INCLUDE_PATH
+            // require_once PIWIK_INCLUDE_PATH . '/plugins/DataExport/vendor/autoload.php';
+            require_once __DIR__ . '/../vendor/autoload.php';
         }
     }
 

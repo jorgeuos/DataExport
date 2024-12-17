@@ -1,5 +1,10 @@
 ## Changelog
 
+
+1.1.9
+- WP handles file paths differently than PIWIK_INCLUDE_PATH, changed to __DIR__ for relative paths
+
+
 1.1.8
 - Added directory check for the export folder for the CSV export
 
