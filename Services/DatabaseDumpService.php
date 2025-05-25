@@ -69,7 +69,7 @@ class DatabaseDumpService {
         return $this->dbReaderConfig;
     }
 
-    public function generateDump($downloadPreference = 'none', $dumpPath = null) {
+    public function generateDump($downloadPreference = 'none', $dumpPath = null, $disableSSL = true) {
         $this->logger->debug('Generating database dump...');
         $this->logger->debug('Download preference: ' . $downloadPreference);
         $this->logger->debug('Dump path: ' . $dumpPath);
@@ -80,23 +80,30 @@ class DatabaseDumpService {
         $dbHost = $dbConfig['host'];
 
         // Make sure the backup directory exists
+        $this->logger->debug('Ensure backup directory exists: ' . $this->backupDir);
         if (!$this->fileService->ensure_directory_exists($this->backupDir)) {
             throw new \Exception("Failed to create backup directory.");
         }
 
+        $this->logger->debug('Creating dump file...');
         $fullPath = $this->backupDir . 'dbdump-' . date('Y-m-d_H-i-s') . '.sql';
         if ($dumpPath) {
             $fullPath = $dumpPath;
         }
 
+        $this->logger->debug('Dump to file path: ' . $fullPath);
+        $disableSSL = $disableSSL ? '--ssl=0' : '';
         $command = sprintf(
-            'mysqldump -u %s -h%s %s > %s',
+            'mysqldump %s -u %s -h%s %s > %s',
+            $disableSSL,
             escapeshellarg($dbUser),
             escapeshellarg($dbHost),
             escapeshellarg($dbName),
             escapeshellarg($fullPath)
         );
 
+        $this->logger->debug('Executing command: ' . $command);
+        // Execute the command
         putenv('MYSQL_PWD=' . $dbPassword);
         exec($command, $output, $returnVar);
         putenv('MYSQL_PWD');
@@ -117,10 +124,12 @@ class DatabaseDumpService {
         // Prepare start and end dates with proper formatting
         $startDate = Date::factory($date, null)->setTime('00:00:00')->toString('Y-m-d H:i:s');
         $endDate = Date::factory($date, null)->setTime('23:59:59')->toString('Y-m-d H:i:s');
+        $table = 'log_link_visit_action';
+        $table = Common::prefixTable($table);
 
         // SQL query with positional parameters
         $sql = "SELECT MIN(idaction_url) AS min_idaction
-                FROM matomo_log_link_visit_action
+                FROM $table
                 WHERE server_time >= ?
                 AND server_time < ?";
 
@@ -134,7 +143,7 @@ class DatabaseDumpService {
     }
 
 
-    public function generateLogDumps($downloadPreference = 'none', $dumpPath = null, $tables = null, $date = null, $siteIds = null) {
+    public function generateLogDumps($downloadPreference = 'none', $dumpPath = null, $tables = null, $date = null, $siteIds = null, $disableSSL = true) {
         $this->logger->debug('Generating database dump...');
         $this->logger->debug('Download preference: ' . $downloadPreference);
         $this->logger->debug('Dump path: ' . $dumpPath);
@@ -196,8 +205,10 @@ class DatabaseDumpService {
 
             // Example:
             // mysqldump --skip-add-drop-table -u root -h localhost matomo matomo_log_action --where="idaction > 123" >> /path/to/dump.sql
+            $disableSSL = $disableSSL ? '--ssl=0' : '';
             $command = sprintf(
-                'mysqldump --skip-add-drop-table -u %s -h%s %s %s %s >> %s',
+                'mysqldump %s --skip-add-drop-table -u %s -h%s %s %s %s >> %s',
+                $disableSSL,
                 escapeshellarg($dbUser),
                 escapeshellarg($dbHost),
                 escapeshellarg($dbName),
@@ -239,16 +250,23 @@ class DatabaseDumpService {
         $dateStart = date('Y-m-d', strtotime($date)) . ' 00:00:00';
         $dateEnd = date('Y-m-d', strtotime($date)) . ' 23:59:59';
 
+        // Table names
+        $table_mlv   = Common::prefixTable('log_visit');
+        $table_mllva = Common::prefixTable('log_link_visit_action');
+        $table_mla   = Common::prefixTable('log_action');
+        $table_mlc   = Common::prefixTable('log_conversion');
+        $table_mlci  = Common::prefixTable('log_conversion_item');
+
         try {
             // Base SQL query with placeholders
-            $sql = 'SELECT * 
-                    FROM matomo_log_visit AS mlv
-                    LEFT JOIN matomo_log_link_visit_action ON mlv.idvisit = matomo_log_link_visit_action.idvisit 
-                    LEFT JOIN matomo_log_action ON matomo_log_action.idaction = matomo_log_link_visit_action.idaction_url 
-                    LEFT JOIN matomo_log_conversion ON mlv.idvisit = matomo_log_conversion.idvisit 
-                    LEFT JOIN matomo_log_conversion_item ON mlv.idvisit = matomo_log_conversion_item.idvisit
-                    WHERE visit_last_action_time >= ?
-                    AND visit_last_action_time <= ?';
+            $sql = "SELECT * 
+                    FROM $table_mlv AS mlv
+                    LEFT JOIN $table_mllva mllva ON mlv.idvisit = mllva.idvisit 
+                    LEFT JOIN $table_mla mla ON mla.idaction = mllva.idaction_url 
+                    LEFT JOIN $table_mlc mlc ON mlv.idvisit = mlc.idvisit 
+                    LEFT JOIN $table_mlci mlci ON mlv.idvisit = mlci.idvisit
+                    WHERE mlv.visit_last_action_time >= ?
+                    AND mlv.visit_last_action_time <= ?";
 
             // Add conditionally for siteId
             $parameters = [

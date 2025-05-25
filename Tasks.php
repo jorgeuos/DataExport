@@ -32,22 +32,28 @@ class Tasks extends \Piwik\Plugin\Tasks
 
     public function schedule()
     {
+        $this->logger->debug('Scheduling tasks');
+        $this->logger->debug('daily cleanBackupsFolderTask');
         $this->daily('cleanBackupsFolderTask', null, self::LOWEST_PRIORITY);
 
+        $this->logger->debug('daily databaseDumpTask');
         $this->daily('databaseDumpTask', null, self::NORMAL_PRIORITY);
 
+        $this->logger->debug('weekly databaseDumpTask');
         $this->weekly('databaseDumpTask', null, self::NORMAL_PRIORITY);
 
     }
 
     public function cleanBackupsFolderTask($force = null)
     {
+        $this->logger->debug('Starting cleanBackupsFolderTask');
         $fileService = new FileService();
         $fileService->cleanBackupsFolder($force);
     }
 
     private function runDatabaseDump()
     {
+        $this->logger->debug('Running database dump');
         $service = new DatabaseDumpService();
         $compress = $this->settings->dataExportAutoDumpCompression->getValue();
         $dumpPath = $service->generateDump($compress, null);

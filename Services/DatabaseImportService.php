@@ -80,7 +80,10 @@ class DatabaseImportService
         return true;
     }
 
-
+    /**
+     * Import log tables only. WiP
+     * @todo: Fix Table prefixes
+     */
     public function importLogDumps($source)
     {
         $this->logger->debug('Importing database dump from: ' . $source);
