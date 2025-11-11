@@ -40,6 +40,17 @@
         "SyncCompressionZip": "zip",
         "SyncCompressionTarGz": "tar.gz",
         "SyncCompressionDesc": "Select the compression type for the backup files.",
-        "CsvCardTitle": "CSV Export - Select all visits and actions by {siteId}"
+        "CsvCardTitle": "CSV Export - Select all visits and actions by {siteId}",
+        "AutoDumpCompression": "Auto Dump Compression",
+        "AutoDumpCompressionDesc": "Select the compression type for the automatic database dumps.",
+        "AutoDumpNone": "None",
+        "AutoDumpCompressionZip": "ZIP",
+        "AutoDumpCompressionTarGz": "TAR.GZ",
+        "AutoDumpCompressionDesc": "Select the compression type for the automatic database dumps.",
+        "DatabaseSSL": "Database SSL Configuration",
+        "DatabaseSSLAuto": "Auto-detect (recommended)",
+        "DatabaseSSLEnabled": "Always use SSL",
+        "DatabaseSSLDisabled": "Never use SSL",
+        "DatabaseSSLDesc": "Controls whether SSL is used for database connections during exports. Auto-detect will use SSL for external connections and disable it for internal/containerized environments."
     }
 }

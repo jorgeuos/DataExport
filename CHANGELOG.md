@@ -1,6 +1,9 @@
 ## Changelog
 
 
+1.1.10
+- Added disabable ssl option to mysqldump command and added some missing translations.
+
 1.1.9
 - WP handles file paths differently than PIWIK_INCLUDE_PATH, changed to __DIR__ for relative paths
 

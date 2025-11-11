@@ -69,6 +69,140 @@ class DatabaseDumpService {
         return $this->dbReaderConfig;
     }
 
+    private function isInternalNetwork($host) {
+        // Remove port if present (e.g., "db:3306" -> "db")
+        $cleanHost = explode(':', $host)[0];
+        
+        // Check for localhost variations
+        if (in_array(strtolower($cleanHost), ['localhost', '127.0.0.1', '::1'])) {
+            return true;
+        }
+        
+        // Check for Docker/Kubernetes service names (typically don't contain dots)
+        if (!filter_var($cleanHost, FILTER_VALIDATE_IP) && !strpos($cleanHost, '.')) {
+            $this->logger->debug("Detected container service name: {$cleanHost}");
+            return true;
+        }
+        
+        // Check for private IP ranges
+        if (filter_var($cleanHost, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $ip = ip2long($cleanHost);
+            if ($ip !== false) {
+                // Private IP ranges (RFC 1918)
+                $private_ranges = [
+                    ['10.0.0.0', '10.255.255.255'],     // 10.0.0.0/8
+                    ['172.16.0.0', '172.31.255.255'],   // 172.16.0.0/12
+                    ['192.168.0.0', '192.168.255.255']  // 192.168.0.0/16
+                ];
+                
+                foreach ($private_ranges as $range) {
+                    if ($ip >= ip2long($range[0]) && $ip <= ip2long($range[1])) {
+                        $this->logger->debug("Detected private IP range: {$cleanHost}");
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        // Check for Docker default networks
+        if (filter_var($cleanHost, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $ip = ip2long($cleanHost);
+            if ($ip !== false) {
+                // Docker default bridge network: 172.17.0.0/16
+                if ($ip >= ip2long('172.17.0.0') && $ip <= ip2long('172.17.255.255')) {
+                    $this->logger->debug("Detected Docker bridge network: {$cleanHost}");
+                    return true;
+                }
+            }
+        }
+        
+        // Check environment variables that indicate containerized environment
+        if (getenv('KUBERNETES_SERVICE_HOST') || getenv('DOCKER_CONTAINER_NAME') || file_exists('/.dockerenv')) {
+            $this->logger->debug("Detected containerized environment");
+            // Additional logic: if we're in a container and the host looks internal
+            if (!strpos($cleanHost, '.') || strpos($cleanHost, '.local') !== false) {
+                return true;
+            }
+        }
+        
+        return false;
+    }    
+
+    private function shouldUseSSL($host) {
+        // Get the plugin's SSL setting
+        $settings = new \Piwik\Plugins\DataExport\SystemSettings();
+        $sslSetting = $settings->dataExportDatabaseSSL->getValue();
+        
+        $this->logger->debug("Database SSL setting: {$sslSetting}");
+        
+        switch ($sslSetting) {
+            case 'enabled':
+                $this->logger->debug("SSL explicitly enabled via plugin setting");
+                return true;
+                
+            case 'disabled':
+                $this->logger->debug("SSL explicitly disabled via plugin setting");
+                return false;
+                
+            case 'auto':
+            default:
+                // Auto-detect based on Matomo config and network context
+                $generalConfig = \Piwik\Config::getInstance()->General;
+                
+                // Check Matomo's SSL-related settings
+                if (!empty($generalConfig['assume_secure_protocol']) && $generalConfig['assume_secure_protocol'] == 1) {
+                    $this->logger->debug("assume_secure_protocol enabled, using SSL");
+                    return true;
+                }
+                
+                if (!empty($generalConfig['force_ssl']) && $generalConfig['force_ssl'] == 1) {
+                    $this->logger->debug("force_ssl enabled, using SSL");
+                    return true;
+                }
+                
+                // Fallback: disable SSL for internal networks
+                if ($this->isInternalNetwork($host)) {
+                    $this->logger->debug("Auto-detect: Internal network, disabling SSL");
+                    return false;
+                }
+                
+                $this->logger->debug("Auto-detect: External network, enabling SSL");
+                return true;
+        }
+    }
+
+    private function getMysqlDumpSslOption() {
+        // Check mysqldump version to determine which SSL option to use
+        exec('mysqldump --version 2>&1', $versionOutput, $returnVar);
+        $versionString = implode(' ', $versionOutput);
+
+        $this->logger->debug('mysqldump version: ' . $versionString);
+
+        // Check if it's MariaDB
+        if (stripos($versionString, 'mariadb') !== false) {
+            $this->logger->debug('Detected MariaDB, using --skip-ssl');
+            return '--skip-ssl';
+        }
+
+        // Extract version number for MySQL (e.g., "8.0.33" from the output)
+        preg_match('/(\d+)\.(\d+)\.(\d+)/', $versionString, $matches);
+
+        if (!empty($matches)) {
+            $majorVersion = (int)$matches[1];
+            $minorVersion = (int)$matches[2];
+
+            // MySQL 5.7.5+ supports --ssl-mode
+            if ($majorVersion >= 8 || ($majorVersion == 5 && $minorVersion >= 7)) {
+                $this->logger->debug('Detected MySQL 5.7+, using --ssl-mode=DISABLED');
+                return '--ssl-mode=DISABLED';
+            }
+        }
+
+        // Fall back to older --ssl option for older MySQL versions
+        $this->logger->debug('Using legacy --ssl=0 option');
+        return '--ssl=0';
+    }
+
     public function generateDump($downloadPreference = 'none', $dumpPath = null) {
         $this->logger->debug('Generating database dump...');
         $this->logger->debug('Download preference: ' . $downloadPreference);
@@ -78,6 +212,7 @@ class DatabaseDumpService {
         $dbUser = $dbConfig['username'];
         $dbPassword = $dbConfig['password'];
         $dbHost = $dbConfig['host'];
+        $dbPort = isset($dbConfig['port']) ? $dbConfig['port'] : 3306;
 
         // Make sure the backup directory exists
         if (!$this->fileService->ensure_directory_exists($this->backupDir)) {
@@ -89,10 +224,36 @@ class DatabaseDumpService {
             $fullPath = $dumpPath;
         }
 
+
+        $this->logger->debug('Args: ' . json_encode([
+            'dbUser' => $dbUser,
+            'dbHost' => $dbHost,
+            'dbName' => $dbName,
+            'fullPath' => $fullPath,
+        ]));
+
+        $debug_version="mysqldump --version";
+        exec($debug_version, $output_version, $returnVar_version);
+        $this->logger->debug('mysqldump version output: ' . implode("\n", $output_version));
+
+        $sslOption = '';
+        if ($this->shouldUseSSL($dbHost)) {
+            // Depending on your MySQL version and configuration, you might need to adjust the SSL options.
+            # --ssl-mode=DISABLED
+            # --ssl-mode=PREFERRED
+            # --ssl-mode=REQUIRED
+            # --ssl=0
+            // Get appropriate SSL option
+            $sslOption = $this->getMysqlDumpSslOption();
+            $this->logger->debug('Using SSL option for mysqldump: ' . $sslOption);
+        }
+
         $command = sprintf(
-            'mysqldump -u %s -h%s %s > %s',
+            'mysqldump %s -u %s -h%s -P %d %s > %s',
+            $sslOption,
             escapeshellarg($dbUser),
             escapeshellarg($dbHost),
+            $dbPort,
             escapeshellarg($dbName),
             escapeshellarg($fullPath)
         );
@@ -147,6 +308,7 @@ class DatabaseDumpService {
         $dbUser = $dbConfig['username'];
         $dbPassword = $dbConfig['password'];
         $dbHost = $dbConfig['host'];
+        $dbPort = isset($dbConfig['port']) ? $dbConfig['port'] : 3306;
     
         // Make sure the backup directory exists
         if (!$this->fileService->ensure_directory_exists($this->backupDir)) {
@@ -194,12 +356,26 @@ class DatabaseDumpService {
                 $fullPath = $dumpPath;
             }
 
+            $sslOption = '';
+            if ($this->shouldUseSSL($dbHost)) {
+                // Depending on your MySQL version and configuration, you might need to adjust the SSL options.
+                # --ssl-mode=DISABLED
+                # --ssl-mode=PREFERRED
+                # --ssl-mode=REQUIRED
+                # --ssl=0
+                // Get appropriate SSL option
+                $sslOption = $this->getMysqlDumpSslOption();
+                $this->logger->debug('Using SSL option for mysqldump: ' . $sslOption);
+            }
+
             // Example:
             // mysqldump --skip-add-drop-table -u root -h localhost matomo matomo_log_action --where="idaction > 123" >> /path/to/dump.sql
             $command = sprintf(
-                'mysqldump --skip-add-drop-table -u %s -h%s %s %s %s >> %s',
+                'mysqldump --skip-add-drop-table %s -u %s -h%s -P %d %s %s %s >> %s',
+                $sslOption,
                 escapeshellarg($dbUser),
                 escapeshellarg($dbHost),
+                $dbPort,
                 escapeshellarg($dbName),
                 escapeshellarg($table),
                 $whereCondition,

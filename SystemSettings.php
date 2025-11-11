@@ -31,6 +31,9 @@ class SystemSettings extends \Piwik\Settings\Plugin\SystemSettings {
     public $dataExportAutoDumpCompression;
 
     /** @var Setting */
+    public $dataExportDatabaseSSL;
+
+    /** @var Setting */
     public $dataExportSyncExternal;
 
     /** @var Setting */
@@ -58,6 +61,7 @@ class SystemSettings extends \Piwik\Settings\Plugin\SystemSettings {
         $this->dataExportBackupPath = $this->createPathSetting();
         $this->dataExportAutoDump = $this->createAutoDumpSetting();
         $this->dataExportAutoDumpCompression = $this->createAutoDumpCompressionSetting();
+        $this->dataExportDatabaseSSL = $this->createDatabaseSSLSetting();
         $this->dataExportSyncExternal = $this->createSyncExternalSetting();
         $this->dataExportSyncOption = $this->createSyncOptionSetting();
         $this->dataExportSyncFilePath = $this->createSyncFilePathSetting();
@@ -99,6 +103,19 @@ class SystemSettings extends \Piwik\Settings\Plugin\SystemSettings {
                 'tar' => Piwik::translate('DataExport_AutoDumpCompressionTarGz'),
             ];
             $field->description = Piwik::translate('DataExport_AutoDumpCompression');
+        });
+    }
+
+    private function createDatabaseSSLSetting() {
+        return $this->makeSetting('dataExportDatabaseSSL', $default = 'auto', FieldConfig::TYPE_STRING, function (FieldConfig $field) {
+            $field->title = Piwik::translate('DataExport_DatabaseSSL');
+            $field->uiControl = FieldConfig::UI_CONTROL_RADIO;
+            $field->availableValues = [
+                'auto' => Piwik::translate('DataExport_DatabaseSSLAuto'),
+                'enabled' => Piwik::translate('DataExport_DatabaseSSLEnabled'),
+                'disabled' => Piwik::translate('DataExport_DatabaseSSLDisabled'),
+            ];
+            $field->description = Piwik::translate('DataExport_DatabaseSSLDesc');
         });
     }
 
