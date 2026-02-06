@@ -1,5 +1,10 @@
 ## Changelog
 
+1.1.11
+- Fixed MariaDB authentication plugin compatibility (caching_sha2_password error)
+- Added support for mariadb-dump command when available
+- Improved SSL detection for containerized environments
+- Enhanced debugging output for dump commands
 
 1.1.10
 - Added disabable ssl option to mysqldump command and added some missing translations.

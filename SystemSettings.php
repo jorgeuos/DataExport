@@ -102,7 +102,7 @@ class SystemSettings extends \Piwik\Settings\Plugin\SystemSettings {
                 'zip' => Piwik::translate('DataExport_AutoDumpCompressionZip'),
                 'tar' => Piwik::translate('DataExport_AutoDumpCompressionTarGz'),
             ];
-            $field->description = Piwik::translate('DataExport_AutoDumpCompression');
+            $field->description = Piwik::translate('DataExport_AutoDumpCompressionDesc');
         });
     }
 
