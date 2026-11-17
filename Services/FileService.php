@@ -252,7 +252,10 @@ class FileService {
             ];
         }
         $ignoreFiles = ['.', '..', '.gitignore', '.DS_Store'];
-        $files = array_diff(scandir($path), $ignoreFiles);
+        $files = array_filter(array_diff(scandir($path), $ignoreFiles), function ($file) {
+            // Hidden files, e.g. the backup job status file
+            return $file[0] !== '.';
+        });
         $size = 0;
         foreach ($files as $file) {
             $size += filesize($path . $file);
