@@ -1,0 +1,19 @@
+# Keeps the GitHub Actions used by the workflows up to date.
+#
+# Composer packages are not listed here on purpose: vendor/ is committed for
+# the Matomo Marketplace, and Dependabot would only update composer.lock and
+# leave vendor/ behind (the CI "vendor matches composer.lock" check would
+# fail). Vulnerable packages still show up as Dependabot alerts and in the
+# weekly `composer audit` run of the Security workflow.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    target-branch: main
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    target-branch: 6.x-dev
