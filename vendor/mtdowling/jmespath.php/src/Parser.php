@@ -5,7 +5,7 @@ use JmesPath\Lexer as T;
 
 /**
  * JMESPath Pratt parser
- * @link http://hall.org.ua/halls/wizzard/pdf/Vaughan.Pratt.TDOP.pdf
+ * @link https://dl.acm.org/doi/10.1145/512927.512931
  */
 class Parser
 {
@@ -22,6 +22,9 @@ class Parser
         T::T_EOF               => 0,
         T::T_QUOTED_IDENTIFIER => 0,
         T::T_IDENTIFIER        => 0,
+        T::T_VARIABLE          => 0,
+        T::T_UNKNOWN           => 0,
+        T::T_LITERAL           => 0,
         T::T_RBRACKET          => 0,
         T::T_RPAREN            => 0,
         T::T_COMMA             => 0,
@@ -30,6 +33,7 @@ class Parser
         T::T_CURRENT           => 0,
         T::T_EXPREF            => 0,
         T::T_COLON             => 0,
+        T::T_ASSIGN            => 0,
         T::T_PIPE              => 1,
         T::T_OR                => 2,
         T::T_AND               => 3,
@@ -57,7 +61,7 @@ class Parser
     /**
      * @param Lexer|null $lexer Lexer used to tokenize expressions
      */
-    public function __construct(Lexer $lexer = null)
+    public function __construct(?Lexer $lexer = null)
     {
         $this->lexer = $lexer ?: new Lexer();
     }
@@ -104,6 +108,10 @@ class Parser
 
     private function nud_identifier()
     {
+        if ($this->isLet()) {
+            return $this->parseLet();
+        }
+
         $token = $this->token;
         $this->next();
         return ['type' => 'field', 'value' => $token['value']];
@@ -115,6 +123,13 @@ class Parser
         $this->next();
         $this->assertNotToken(T::T_LPAREN);
         return ['type' => 'field', 'value' => $token['value']];
+    }
+
+    private function nud_variable()
+    {
+        $token = $this->token;
+        $this->next();
+        return ['type' => 'variable', 'value' => $token['value']];
     }
 
     private function nud_current()
@@ -272,6 +287,10 @@ class Parser
 
     private function led_lparen(array $left)
     {
+        if (!isset($left['type'], $left['value']) || $left['type'] !== 'field') {
+            throw $this->syntax('Invalid function name');
+        }
+
         $args = [];
         $this->next();
 
@@ -347,6 +366,12 @@ class Parser
         if ($this->token['type'] == T::T_LBRACKET) {
             $this->next();
             return $this->parseMultiSelectList();
+        } elseif ($this->token['type'] == T::T_LBRACE) {
+            // Like the multi-select list above, a multi-select hash ends any
+            // projection: tokens that follow apply to the projected list.
+            return $this->nud_lbrace();
+        } elseif ($this->isLet()) {
+            throw $this->syntax('A let expression is not allowed after a dot');
         }
 
         return $this->expr($bp);
@@ -366,7 +391,40 @@ class Parser
         ];
     }
 
-    private function parseWildcardObject(array $left = null)
+    private function parseLet()
+    {
+        static $validVariable = [T::T_VARIABLE => true];
+        static $validAssign = [T::T_ASSIGN => true];
+        $bindings = [];
+
+        do {
+            $this->next($validVariable);
+            $name = $this->token['value'];
+            $this->next($validAssign);
+            $this->next();
+            $bindings[] = [
+                'type'     => 'variable_binding',
+                'value'    => $name,
+                'children' => [$this->expr()]
+            ];
+        } while ($this->token['type'] == T::T_COMMA);
+
+        if ($this->token['type'] !== T::T_IDENTIFIER || $this->token['value'] !== 'in') {
+            throw $this->syntax('Expected "in" after the let bindings');
+        }
+
+        $this->next();
+
+        return [
+            'type'     => 'let',
+            'children' => [
+                ['type' => 'bindings', 'children' => $bindings],
+                $this->expr()
+            ]
+        ];
+    }
+
+    private function parseWildcardObject(?array $left = null)
     {
         $this->next();
 
@@ -380,7 +438,7 @@ class Parser
         ];
     }
 
-    private function parseWildcardArray(array $left = null)
+    private function parseWildcardArray(?array $left = null)
     {
         static $getRbracket = [T::T_RBRACKET => true];
         $this->next($getRbracket);
@@ -466,6 +524,14 @@ class Parser
         return new SyntaxErrorException($msg, $this->token, $this->expression);
     }
 
+    private function isLet()
+    {
+        // "let" is only a keyword before a variable; elsewhere it is a field.
+        return $this->token['type'] === T::T_IDENTIFIER
+            && $this->token['value'] === 'let'
+            && $this->lookahead() === T::T_VARIABLE;
+    }
+
     private function lookahead()
     {
         return (!isset($this->tokens[$this->tpos + 1]))
@@ -473,7 +539,7 @@ class Parser
             : $this->tokens[$this->tpos + 1]['type'];
     }
 
-    private function next(array $match = null)
+    private function next(?array $match = null)
     {
         if (!isset($this->tokens[$this->tpos + 1])) {
             $this->token = self::$nullToken;

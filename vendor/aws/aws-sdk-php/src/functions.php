@@ -1,9 +1,10 @@
 <?php
 namespace Aws;
 
-use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\FnStream;
+use GuzzleHttp\Utils;
 use Psr\Http\Message\RequestInterface;
-use GuzzleHttp\ClientInterface;
+use Psr\Http\Message\StreamInterface;
 use GuzzleHttp\Promise\FulfilledPromise;
 
 //-----------------------------------------------------------------------------
@@ -269,22 +270,17 @@ function describe_type($input)
 /**
  * Creates a default HTTP handler based on the available clients.
  *
+ * @param string|null $transportSharing Optional transport sharing mode
+ *        ("none", "handler_prefer", "handler_require", "persistent_prefer",
+ *        or "persistent_require") to apply to the underlying HTTP client.
+ *        The "*_prefer" modes degrade gracefully when the installed version
+ *        of Guzzle cannot honor them, and the "*_require" modes throw.
+ *
  * @return callable
  */
-function default_http_handler()
+function default_http_handler(?string $transportSharing = null)
 {
-    $version = guzzle_major_version();
-    // If Guzzle 6 or 7 installed
-    if ($version === 6 || $version === 7) {
-        return new \Aws\Handler\GuzzleV6\GuzzleHandler();
-    }
-
-    // If Guzzle 5 installed
-    if ($version === 5) {
-        return new \Aws\Handler\GuzzleV5\GuzzleHandler();
-    }
-
-    throw new \RuntimeException('Unknown Guzzle version: ' . $version);
+    return new \Aws\Handler\Guzzle\GuzzleHandler(null, $transportSharing);
 }
 
 /**
@@ -294,47 +290,7 @@ function default_http_handler()
  */
 function default_user_agent()
 {
-    $version = guzzle_major_version();
-    // If Guzzle 6 or 7 installed
-    if ($version === 6 || $version === 7) {
-        return \GuzzleHttp\default_user_agent();
-    }
-
-    // If Guzzle 5 installed
-    if ($version === 5) {
-        return \GuzzleHttp\Client::getDefaultUserAgent();
-    }
-
-    throw new \RuntimeException('Unknown Guzzle version: ' . $version);
-}
-
-/**
- * Get the major version of guzzle that is installed.
- *
- * @internal This function is internal and should not be used outside aws/aws-sdk-php.
- * @return int
- * @throws \RuntimeException
- */
-function guzzle_major_version()
-{
-    static $cache = null;
-    if (null !== $cache) {
-        return $cache;
-    }
-
-    if (defined('\GuzzleHttp\ClientInterface::VERSION')) {
-        $version = (string) ClientInterface::VERSION;
-        if ($version[0] === '6') {
-            return $cache = 6;
-        }
-        if ($version[0] === '5') {
-            return $cache = 5;
-        }
-    } elseif (defined('\GuzzleHttp\ClientInterface::MAJOR_VERSION')) {
-        return $cache = ClientInterface::MAJOR_VERSION;
-    }
-
-    throw new \RuntimeException('Unable to determine what Guzzle version is installed.');
+    return Utils::defaultUserAgent();
 }
 
 /**
@@ -603,3 +559,35 @@ function strip_fips_pseudo_regions($region)
     return str_replace(['fips-', '-fips'], ['', ''], $region);
 }
 
+/**
+ * Checks if an array is associative
+ *
+ * @param array $array
+ *
+ * @return bool
+ */
+function is_associative(array $array): bool
+{
+    if (empty($array)) {
+        return false;
+    }
+
+    return !array_is_list($array);
+}
+
+/**
+ * Decorates a PSR-7 stream so close() detaches the underlying resource
+ * instead of fclose()-ing it. Use at sites where the SDK wraps a
+ * user-owned PHP resource.
+ *
+ * @param StreamInterface $stream
+ * @return StreamInterface
+ */
+function detach_on_close_stream(StreamInterface $stream): StreamInterface
+{
+    return FnStream::decorate($stream, [
+        'close' => static function () use ($stream) {
+            $stream->detach();
+        },
+    ]);
+}

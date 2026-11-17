@@ -1,8 +1,63 @@
 # CHANGELOG
 
-## 2.7.0 - UPCOMING
+## 2.10.0 - 2026-11-17
 
-* Fixed flattening in arrays starting with null
+* Added PHP 8.6 support.
+* Added support for JEP-18 lexical scoping with let expressions.
+* Fixed the compiled runtime to evaluate sub-expressions when the left side is null.
+* Fixed the ordering operators to return null instead of false for non-numbers.
+* Fixed aggregate and sort functions to error on an invalid first or only element.
+* Raised the minimum symfony/polyfill-mbstring version to 1.30.
+* Improved the performance of type checks on large arrays.
+
+## 2.9.4 - 2026-11-17
+
+* Fixed the compiled runtime to use a private default cache directory, preventing local code execution.
+
+## 2.9.3 - 2026-11-16
+
+* Fixed merge() to error on scalar and null arguments instead of triggering PHP errors.
+* Fixed merge() to accept stdClass objects.
+* Fixed syntax error messages for unexpected array, object, boolean and null literals.
+* Fixed contains() with an empty search string on PHP 7.
+
+## 2.9.2 - 2026-07-06
+
+* Pass explicit trim characters ahead of the PHP 8.6 trim default change.
+
+## 2.9.1 - 2026-06-11
+
+* Fixed the compiled runtime to emit function names as string literals, preventing arbitrary code execution.
+* Fixed the parser to reject non-identifier function callees, such as literal and raw string callees.
+
+## 2.9.0 - 2026-06-10
+
+* Added PHP 8.5 support.
+* Fixed to_number() to parse number strings using the JSON number grammar.
+* Fixed reverse() and string slicing to operate on UTF-8 characters rather than bytes.
+* Fixed slicing of array-like (ArrayAccess + Countable) values.
+* Fixed equality and contains() to use JSON semantics, e.g. 1 == 1.0 is now true.
+* Fixed multi-select hashes to end projections, so following tokens apply to the projected list.
+* Fixed sort() and sort_by() to compare numbers numerically.
+* Changed sort(), sort_by(), max(), min(), max_by() and min_by() to order strings by code point.
+* Fixed max_by() and min_by() to error on mixed-type keys instead of returning arbitrary elements.
+* Fixed max() returning null or erroring when the first array element is falsy, e.g. max([0, 1]).
+* Fixed sum() and join() to return 0 and an empty string respectively for empty arrays.
+* Fixed 0.0 to be truthy in filters and logical operators, like every other number.
+* Fixed the compiled runtime to apply JMESPath truthiness to || and &&.
+* Fixed @(foo), foo[-] and oversized index literals to throw syntax errors.
+* Fixed PHP warnings emitted while parsing certain invalid expressions.
+* Fixed the caret position in syntax error messages for errors at the end of an expression.
+* Fixed map() to error on non-array second arguments instead of returning [].
+* Fixed Env::cleanCompileDir() when JP_PHP_COMPILE=on.
+
+## 2.8.0 - 2024-09-04
+
+* Add support for PHP 8.4.
+
+## 2.7.0 - 2023-08-15
+
+* Fixed flattening in arrays starting with null.
 * Drop support for HHVM and PHP earlier than 7.2.5.
 * Add support for PHP 8.1, 8.2, and 8.3.
 

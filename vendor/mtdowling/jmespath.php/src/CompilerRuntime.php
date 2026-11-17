@@ -8,26 +8,34 @@ namespace JmesPath;
  * logic to determine the filename:
  *
  * 1. Start with the string "jmespath_"
- * 2. Append the MD5 checksum of the expression.
+ * 2. Append the MD5 checksum of the expression salted with the PHP version
+ *    and compiled-cache epoch.
  * 3. Append ".php"
  */
 class CompilerRuntime
 {
+    const CACHE_VERSION = 7;
+
     private $parser;
     private $compiler;
     private $cacheDir;
     private $interpreter;
+    private $tempDir;
 
     /**
      * @param string|null $dir Directory used to store compiled PHP files.
      * @param Parser|null $parser JMESPath parser to utilize
      * @throws \RuntimeException if the cache directory cannot be created
      */
-    public function __construct($dir = null, Parser $parser = null)
+    public function __construct($dir = null, ?Parser $parser = null)
     {
         $this->parser = $parser ?: new Parser();
         $this->compiler = new TreeCompiler();
-        $dir = $dir ?: sys_get_temp_dir();
+
+        if (!$dir) {
+            $dir = self::defaultCacheDir();
+            $this->tempDir = realpath(sys_get_temp_dir());
+        }
 
         if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
             throw new \RuntimeException("Unable to create cache directory: $dir");
@@ -51,9 +59,14 @@ class CompilerRuntime
      */
     public function __invoke($expression, $data)
     {
-        $functionName = 'jmespath_' . md5($expression);
+        $functionName = self::functionName($expression);
 
         if (!function_exists($functionName)) {
+            if ($this->tempDir) {
+                // A long-lived process can outlive the directory it checked.
+                $this->cacheDir = self::defaultCacheDir($this->tempDir);
+            }
+
             $filename = "{$this->cacheDir}/{$functionName}.php";
             if (!file_exists($filename)) {
                 $this->compile($filename, $expression, $functionName);
@@ -64,6 +77,77 @@ class CompilerRuntime
         return $functionName($this->interpreter, $data);
     }
 
+    /**
+     * @internal Shared with DebugRuntime so cache naming cannot drift.
+     */
+    public static function functionName($expression)
+    {
+        return 'jmespath_' . md5(
+            'jmespath:' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION
+            . ':' . self::CACHE_VERSION . ':' . $expression
+        );
+    }
+
+    /**
+     * @internal Shared with Env so the default location cannot drift.
+     */
+    public static function defaultCacheDir($temp = null)
+    {
+        $dir = $temp ?: sys_get_temp_dir();
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            return $dir;
+        }
+
+        $uid = self::effectiveUserId();
+        $dir = rtrim($dir, '/') . "/jmespath-{$uid}";
+
+        clearstatcache(true, $dir);
+
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0700, true);
+        }
+
+        // A single lstat() so the type, owner and mode describe the same file.
+        $stat = @lstat($dir);
+
+        if (!$stat
+            || ($stat['mode'] & 0170000) !== 0040000
+            || $stat['uid'] !== $uid
+            || ($stat['mode'] & 0077) !== 0
+        ) {
+            throw new \RuntimeException(
+                "Unable to use private cache directory: {$dir}"
+            );
+        }
+
+        return $dir;
+    }
+
+    /** @internal */
+    public function getCacheDir()
+    {
+        return $this->cacheDir;
+    }
+
+    private static function effectiveUserId()
+    {
+        if (function_exists('posix_geteuid')) {
+            return posix_geteuid();
+        }
+
+        $file = tmpfile();
+
+        if (!$file) {
+            throw new \RuntimeException('Unable to determine the current user');
+        }
+
+        $uid = fstat($file)['uid'];
+        fclose($file);
+
+        return $uid;
+    }
+
     private function compile($filename, $expression, $functionName)
     {
         $code = $this->compiler->visit(
@@ -72,12 +156,26 @@ class CompilerRuntime
             $expression
         );
 
-        if (!file_put_contents($filename, $code)) {
+        $tempFile = $filename . '.' . bin2hex(random_bytes(12)) . '.tmp';
+
+        if (!file_put_contents($tempFile, $code)) {
             throw new \RuntimeException(sprintf(
                 'Unable to write the compiled PHP code to: %s (%s)',
-                $filename,
+                $tempFile,
                 var_export(error_get_last(), true)
             ));
+        }
+
+        if (!rename($tempFile, $filename)) {
+            @unlink($tempFile);
+            if (!file_exists($filename)) {
+                throw new \RuntimeException(
+                    "Unable to move the compiled PHP code to: {$filename}"
+                );
+            }
+            // Another process won the race; its file is equivalent.
+        } elseif (function_exists('opcache_invalidate')) {
+            opcache_invalidate($filename, true);
         }
     }
 }
