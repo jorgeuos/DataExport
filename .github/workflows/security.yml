@@ -21,7 +21,7 @@ jobs:
         # Scheduled runs check both release lines; other events check the current ref.
         branch: ${{ github.event_name == 'schedule' && fromJSON('["main", "6.x-dev"]') || fromJSON('[""]') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ matrix.branch }}
           persist-credentials: false
@@ -41,7 +41,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/dependency-review-action@v4
+      - uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: moderate
           comment-summary-in-pr: on-failure
