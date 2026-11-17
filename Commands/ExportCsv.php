@@ -17,22 +17,29 @@ class ExportCsv extends ConsoleCommand
     protected function configure()
     {
         $this->setName('dataexport:csv');
-        $this->setDescription('ExportCsv');
-        
+        $this->setDescription('Export all visits and actions for one day to a CSV file.');
+
         $this->addOptionalValueOption(
             'dest',
             'd',
-            'Output destination',
+            'Output file. A bare file name is written to the backup folder. Defaults to dump-{date}-{sites}-{now}.csv in the backup folder.'
         );
         $this->addOptionalValueOption(
             'report',
             'r',
-            'Which report to export. Defaults to selectAllVisitsAndActions',
+            'Which report to export. Only selectAllVisitsAndActions is available.',
+            'selectAllVisitsAndActions'
         );
         $this->addOptionalValueOption(
             'date',
             null,
-            'Date to export. Defaults to yesterday.',
+            'Date to export (YYYY-MM-DD, "today" or "yesterday"). Defaults to yesterday.',
+            'yesterday'
+        );
+        $this->addOptionalValueOption(
+            'idsite',
+            'i',
+            'Only export this site ID. Defaults to all sites.'
         );
     }
 
@@ -42,26 +49,24 @@ class ExportCsv extends ConsoleCommand
         $output = $this->getOutput();
 
         $dest = $input->getOption('dest');
-        if (!empty($dest) && dirname($dest) != '.') {
+        if (!empty($dest) && dirname($dest) === '.') {
             $fileService = new FileService();
             $dest = $fileService->getBackupDir() . $dest;
         }
 
-        $date = $input->getOption('date');
+        $date = $input->getOption('date') ?: 'yesterday';
+        $siteId = $input->getOption('idsite');
+        $siteId = $siteId !== null && $siteId !== '' ? (int) $siteId : null;
 
         $databaseDumpService = new DatabaseDumpService();
+        $path = $databaseDumpService->selectAllVisitsAndActions($dest ?: null, $date, $siteId);
 
-        if ($input->getOption('report') == 'selectAllVisitsAndActionsSiteId') {
-            $siteId = $input->getOption('siteId');
-            $databaseDumpService->selectAllVisitsAndActions($dest, $date, $siteId);
-        }
-        else {
-            $databaseDumpService->selectAllVisitsAndActions($dest, $date);
+        if (!$path) {
+            $output->writeln('<comment>ExportCsv: no data found for the given date, no file written.</comment>');
+            return self::SUCCESS;
         }
 
-
-        $message = sprintf('<info>ExportCsv: CSV created.</info>');
-        $output->writeln($message);
+        $output->writeln(sprintf('<info>ExportCsv: CSV created at %s</info>', $path));
 
         return self::SUCCESS;
     }
