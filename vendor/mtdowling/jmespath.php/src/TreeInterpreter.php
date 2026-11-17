@@ -9,12 +9,15 @@ class TreeInterpreter
     /** @var callable */
     private $fnDispatcher;
 
+    /** @var array Variables in scope, keyed by name */
+    private $scope = [];
+
     /**
      * @param callable|null $fnDispatcher Function dispatching function that accepts
      *                                    a function name argument and an array of
      *                                    function arguments and returns the result.
      */
-    public function __construct(callable $fnDispatcher = null)
+    public function __construct(?callable $fnDispatcher = null)
     {
         $this->fnDispatcher = $fnDispatcher ?: FnDispatcher::getInstance();
     }
@@ -30,6 +33,22 @@ class TreeInterpreter
     public function visit(array $node, $data)
     {
         return $this->dispatch($node, $data);
+    }
+
+    /**
+     * Returns a copy of the interpreter that has the given variables in scope.
+     *
+     * @param array $scope Variables to bind, keyed by name
+     *
+     * @return static
+     */
+    public function withScope(array $scope)
+    {
+        // Bind on a copy so that expression references keep their variables.
+        $interpreter = clone $this;
+        $interpreter->scope = $scope + $this->scope;
+
+        return $interpreter;
     }
 
     /**
@@ -69,7 +88,8 @@ class TreeInterpreter
 
             case 'projection':
                 $left = $this->dispatch($node['children'][0], $value);
-                switch ($node['from']) {
+                $from = isset($node['from']) ? $node['from'] : null;
+                switch ($from) {
                     case 'object':
                         if (!Utils::isObject($left)) {
                             return null;
@@ -81,7 +101,7 @@ class TreeInterpreter
                         }
                         break;
                     default:
-                        if (!is_array($left) || !($left instanceof \stdClass)) {
+                        if (!is_array($left) && !($left instanceof \stdClass)) {
                             return null;
                         }
                 }
@@ -122,6 +142,12 @@ class TreeInterpreter
             case 'current':
                 return $value;
 
+            case 'variable':
+                if (!array_key_exists($node['value'], $this->scope)) {
+                    throw new \RuntimeException('Undefined variable: $' . $node['value']);
+                }
+                return $this->scope[$node['value']];
+
             case 'or':
                 $result = $this->dispatch($node['children'][0], $value);
                 return Utils::isTruthy($result)
@@ -144,6 +170,17 @@ class TreeInterpreter
                     $node['children'][1],
                     $this->dispatch($node['children'][0], $value)
                 );
+
+            case 'let':
+                $bound = [];
+                foreach ($node['children'][0]['children'] as $binding) {
+                    $bound[$binding['value']] = $this->dispatch(
+                        $binding['children'][0],
+                        $value
+                    );
+                }
+
+                return $this->withScope($bound)->dispatch($node['children'][1], $value);
 
             case 'multi_select_list':
                 if ($value === null) {
@@ -216,12 +253,12 @@ class TreeInterpreter
     }
 
     /**
-     * @return bool
+     * @return bool|null
      */
     private static function relativeCmp($left, $right, $cmp)
     {
         if (!(is_int($left) || is_float($left)) || !(is_int($right) || is_float($right))) {
-            return false;
+            return null;
         }
 
         switch ($cmp) {

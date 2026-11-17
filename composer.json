@@ -10,5 +10,16 @@
     "require": {
         "aws/aws-sdk-php": "^3.173.19",
         "phpseclib/phpseclib": "^3.0"
+    },
+    "config": {
+        "platform": {
+            "php": "7.2.5"
+        },
+        "audit": {
+            "ignore": {
+                "PKSA-4t1p-xpk2-nsss": "GHSA-27qh-8cxx-2cr5 (CloudFront signed policies): DataExport does not use CloudFront. The fix needs aws-sdk-php 3.372+, which requires PHP 8.1, while the 1.x line supports Matomo 5 on PHP 7.2.5+. Fixed on the 2.x line.",
+                "PKSA-dxyf-6n16-t87m": "CVE-2025-14761 (S3 Encryption Client key commitment): DataExport uploads with the plain S3Client, not S3EncryptionClient. The fix needs aws-sdk-php 3.368+, which requires PHP 8.1. Fixed on the 2.x line."
+            }
+        }
     }
 }
