@@ -26,8 +26,10 @@ class DataExport extends \Piwik\Plugin {
 
     public function onInit()
     {
-        if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
-            require_once __DIR__ . '/../vendor/autoload.php';
+        // Use __DIR__ so this also works when Matomo runs inside WordPress
+        // (https://github.com/jorgeuos/DataExport/issues/4)
+        if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+            require_once __DIR__ . '/vendor/autoload.php';
         }
     }
 
