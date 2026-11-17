@@ -1,0 +1,4 @@
+# Not needed in installed copies of the plugin (git archive, release zips)
+/.github export-ignore
+/.gitattributes export-ignore
+/tests export-ignore
