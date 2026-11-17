@@ -131,8 +131,8 @@ class FileService {
      */
     public function cleanBackupsFolder($force = null) {
         $this->logger->info("Run cleanup task");
-        $backupFolder = $this->backupDir;
-        $filePatterns = ['*.sql', '*.zip', '*.tar.gz'];
+        $backupFolder = $this->getBackupDir();
+        $filePatterns = ['*.sql', '*.sql.gz', '*.zip', '*.tar.gz', '*.csv'];
         $daysOld = 7;
 
         // Calculate the threshold date/time for deletion
