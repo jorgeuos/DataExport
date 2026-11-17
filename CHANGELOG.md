@@ -1,8 +1,18 @@
 ## Changelog
 
 2.0.0
-- Matomo 6 compatibility (#8). Requires Matomo 6 and PHP 8.1. Same features as 1.2.0;
+- Matomo 6 compatibility (#8). Requires Matomo 6 and PHP 8.1. Same features as 1.2.1;
   1.x stays available for Matomo 5.
+- Security: the bundled libraries (AWS SDK, Guzzle, PSR-7, jmespath.php, phpseclib) are
+  updated to their current releases, with no known advisories.
+
+1.2.1
+- Fixed: the plugin stopped with "Your Composer dependencies require a PHP version >= 8.1.0"
+  on PHP 7.2 to 8.0, although Matomo 5 supports PHP 7.2.5. The bundled libraries are now
+  installed for PHP 7.2.5.
+- Security: updated the bundled libraries (jmespath.php, Guzzle, PSR-7, phpseclib, AWS SDK)
+  to versions with fixes for published advisories, including a critical one in jmespath.php.
+- Fixed: the sync settings screenshot in the description on the Matomo Marketplace.
 
 1.2.0
 - New: backups work without mysqldump. A built-in PHP dumper is used automatically when
