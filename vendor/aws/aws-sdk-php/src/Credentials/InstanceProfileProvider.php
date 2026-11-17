@@ -60,6 +60,9 @@ class InstanceProfileProvider
     /** @var string */
     private $endpointMode;
 
+    /** @var array */
+    private $config;
+
     /**
      * The constructor accepts the following options:
      *
@@ -68,16 +71,19 @@ class InstanceProfileProvider
      * - retries: Optional number of retries to be attempted.
      * - ec2_metadata_v1_disabled: Optional for disabling the fallback to IMDSv1.
      * - endpoint: Optional for overriding the default endpoint to be used for fetching credentials.
-     *             The value must contain a valid URI scheme. If the URI scheme is not https, it must
-     *             resolve to a loopback address.
+     *   The value must contain a valid URI scheme. If the URI scheme is not https, it must
+     *   resolve to a loopback address.
      * - endpoint_mode: Optional for overriding the default endpoint mode (IPv4|IPv6) to be used for
      *   resolving the default endpoint.
+     * - use_aws_shared_config_files: Decides whether the shared config file should be considered when
+     *   using the ConfigurationResolver::resolve method.
      *
      * @param array $config Configuration options.
      */
     public function __construct(array $config = [])
     {
-        $this->timeout = (float) getenv(self::ENV_TIMEOUT) ?: ($config['timeout'] ?? self::DEFAULT_TIMEOUT);
+        $timeout = (float) getenv(self::ENV_TIMEOUT) ?: ($config['timeout'] ?? self::DEFAULT_TIMEOUT);
+        $this->timeout = is_string($timeout) && is_numeric($timeout) ? (float) $timeout : $timeout;
         $this->profile = $config['profile'] ?? null;
         $this->retries = (int) getenv(self::ENV_RETRIES) ?: ($config['retries'] ?? self::DEFAULT_RETRIES);
         $this->client = $config['client'] ?? \Aws\default_http_handler();
@@ -88,6 +94,7 @@ class InstanceProfileProvider
         }
 
         $this->endpointMode = $config[self::CFG_EC2_METADATA_SERVICE_ENDPOINT_MODE] ?? null;
+        $this->config = $config;
     }
 
     /**
@@ -220,7 +227,9 @@ class InstanceProfileProvider
                     $result['AccessKeyId'],
                     $result['SecretAccessKey'],
                     $result['Token'],
-                    strtotime($result['Expiration'])
+                    strtotime($result['Expiration']),
+                    $result['AccountId'] ?? null,
+                    CredentialSources::IMDS
                 );
             }
 
@@ -257,7 +266,7 @@ class InstanceProfileProvider
         $userAgent .= ' ' . \Aws\default_user_agent();
         $request = $request->withHeader('User-Agent', $userAgent);
         foreach ($headers as $key => $value) {
-            $request = $request->withHeader($key, $value);
+            $request = $request->withHeader($key, (string) $value);
         }
 
         return $fn($request, ['timeout' => $this->timeout])
@@ -344,7 +353,7 @@ class InstanceProfileProvider
                     self::CFG_EC2_METADATA_V1_DISABLED,
                     self::DEFAULT_AWS_EC2_METADATA_V1_DISABLED,
                     'bool',
-                    ['use_aws_shared_config_files' => true]
+                    $this->config
                 )
             )
             ?? self::DEFAULT_AWS_EC2_METADATA_V1_DISABLED;
@@ -369,7 +378,7 @@ class InstanceProfileProvider
                 self::CFG_EC2_METADATA_SERVICE_ENDPOINT,
                 $this->getDefaultEndpoint(),
                 'string',
-                ['use_aws_shared_config_files' => true]
+                $this->config
             );
         }
 
@@ -420,7 +429,7 @@ class InstanceProfileProvider
                 self::CFG_EC2_METADATA_SERVICE_ENDPOINT_MODE,
                     self::ENDPOINT_MODE_IPv4,
                 'string',
-                ['use_aws_shared_config_files' => true]
+                $this->config
             );
         }
 

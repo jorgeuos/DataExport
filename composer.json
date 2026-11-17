@@ -10,5 +10,10 @@
     "require": {
         "aws/aws-sdk-php": "^3.173.19",
         "phpseclib/phpseclib": "^3.0"
+    },
+    "config": {
+        "platform": {
+            "php": "8.1.0"
+        }
     }
 }
