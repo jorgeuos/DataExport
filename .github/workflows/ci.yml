@@ -22,8 +22,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 1.x supports Matomo 5: PHP 7.2.5 up to the newest PHP release
-        php: ['7.2', '7.4', '8.0', '8.2', '8.4']
+        # 1.x supports Matomo 5: PHP 7.2.5 to 8.6
+        php: ['7.2', '7.4', '8.0', '8.2', '8.4', '8.6']
     steps:
       - uses: actions/checkout@v7
         with:
@@ -64,12 +64,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # The matomo5_*_php aliases of matomo-org/github-action-tests follow
+        # Matomo's supported PHP range, so they don't need updating by hand.
         include:
           - matomo: minimum_required_matomo
-            php: '7.2'
+            php: matomo5_min_php
             db: Mysql
           - matomo: maximum_supported_matomo
-            php: '8.4'
+            php: matomo5_max_php
             db: Mariadb
     steps:
       - uses: actions/checkout@v7
