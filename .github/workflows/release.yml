@@ -107,6 +107,6 @@ jobs:
           LATEST: ${{ needs.check.outputs.latest }}
           PRERELEASE: ${{ needs.check.outputs.prerelease }}
         run: |
-          args=(--title "$VERSION" --notes-file release-notes.md --target "$GITHUB_SHA" --latest="$LATEST")
+          args=(--title "$TAG" --notes-file release-notes.md --target "$GITHUB_SHA" --latest="$LATEST")
           if [ "$PRERELEASE" = true ]; then args+=(--prerelease); fi
           gh release create "$TAG" "DataExport-$VERSION.zip" "${args[@]}"
