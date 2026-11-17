@@ -31,6 +31,9 @@ class SystemSettings extends \Piwik\Settings\Plugin\SystemSettings {
     public $dataExportAutoDumpCompression;
 
     /** @var Setting */
+    public $dataExportDumpMethod;
+
+    /** @var Setting */
     public $dataExportDatabaseSSL;
 
     /** @var Setting */
@@ -61,6 +64,7 @@ class SystemSettings extends \Piwik\Settings\Plugin\SystemSettings {
         $this->dataExportBackupPath = $this->createPathSetting();
         $this->dataExportAutoDump = $this->createAutoDumpSetting();
         $this->dataExportAutoDumpCompression = $this->createAutoDumpCompressionSetting();
+        $this->dataExportDumpMethod = $this->createDumpMethodSetting();
         $this->dataExportDatabaseSSL = $this->createDatabaseSSLSetting();
         $this->dataExportSyncExternal = $this->createSyncExternalSetting();
         $this->dataExportSyncOption = $this->createSyncOptionSetting();
@@ -103,6 +107,19 @@ class SystemSettings extends \Piwik\Settings\Plugin\SystemSettings {
                 'tar' => Piwik::translate('DataExport_AutoDumpCompressionTarGz'),
             ];
             $field->description = Piwik::translate('DataExport_AutoDumpCompression');
+        });
+    }
+
+    private function createDumpMethodSetting() {
+        return $this->makeSetting('dataExportDumpMethod', $default = 'auto', FieldConfig::TYPE_STRING, function (FieldConfig $field) {
+            $field->title = Piwik::translate('DataExport_DumpMethod');
+            $field->uiControl = FieldConfig::UI_CONTROL_RADIO;
+            $field->availableValues = [
+                'auto' => Piwik::translate('DataExport_DumpMethodAuto'),
+                'mysqldump' => Piwik::translate('DataExport_DumpMethodMysqldump'),
+                'php' => Piwik::translate('DataExport_DumpMethodPhp'),
+            ];
+            $field->description = Piwik::translate('DataExport_DumpMethodDesc');
         });
     }
 

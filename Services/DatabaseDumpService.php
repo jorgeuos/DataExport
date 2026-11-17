@@ -9,8 +9,10 @@
 
 namespace Piwik\Plugins\DataExport\Services;
 
-use COM;
-use Piwik\Plugins\DataExport\Services\FileService;
+use Piwik\Plugins\DataExport\Services\Dump\DbConnectionFactory;
+use Piwik\Plugins\DataExport\Services\Dump\MysqlCli;
+use Piwik\Plugins\DataExport\Services\Dump\PhpSqlDumper;
+use Piwik\Plugins\DataExport\SystemSettings;
 use Piwik\Container\StaticContainer;
 use Psr\Log\LoggerInterface;
 use Piwik\Db;
@@ -19,15 +21,19 @@ use Piwik\Date;
 
 class DatabaseDumpService {
 
-    /**
-     * @var array
-     */
-    protected $dbConfig;
+    public const METHOD_AUTO = 'auto';
+    public const METHOD_MYSQLDUMP = 'mysqldump';
+    public const METHOD_PHP = 'php';
 
     /**
-     * @var array
+     * Log tables and the column used to filter them by date.
      */
-    protected $dbReaderConfig;
+    private const LOG_TABLE_DATE_COLUMNS = [
+        'log_visit' => 'visit_first_action_time',
+        'log_link_visit_action' => 'server_time',
+        'log_conversion' => 'server_time',
+        'log_conversion_item' => 'server_time',
+    ];
 
     /**
      * @var string
@@ -54,19 +60,16 @@ class DatabaseDumpService {
      */
     public function __construct(?LoggerInterface $logger = null) {
         $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
-        $this->dbConfig = \Piwik\Config::getInstance()->database;
-        $this->dbReaderConfig = \Piwik\Config::getInstance()->database_reader;
-        $this->fileService = new FileService();
+        $this->fileService = new FileService($this->logger);
         $this->backupDir = $this->fileService->getBackupDir();
         $this->db = Db::get();
     }
 
+    /**
+     * Connection config for dumps: the reader database when one is configured.
+     */
     private function getDbConfig() {
-        if (empty($this->dbReaderConfig['host'])) {
-            return $this->dbConfig;
-        }
-        $this->logger->debug('Using read-only database configuration.');
-        return $this->dbReaderConfig;
+        return DbConnectionFactory::getConfig(true);
     }
 
     private function isInternalNetwork($host) {
@@ -126,149 +129,193 @@ class DatabaseDumpService {
         }
         
         return false;
-    }    
+    }
 
-    private function shouldUseSSL($host) {
-        // Get the plugin's SSL setting
-        $settings = new \Piwik\Plugins\DataExport\SystemSettings();
+    /**
+     * Whether SSL must be explicitly disabled for the mysqldump connection.
+     *
+     * - "enabled": never disable SSL (the client default, SSL when available).
+     * - "disabled": always disable SSL.
+     * - "auto": keep SSL when Matomo's own connection uses it
+     *   ([database] enable_ssl = 1), otherwise disable it for internal hosts
+     *   (localhost, Docker/Kubernetes service names, private IPs), where
+     *   servers often have self-signed or no certificates.
+     */
+    private function shouldDisableSsl(array $dbConfig): bool {
+        $settings = new SystemSettings();
         $sslSetting = $settings->dataExportDatabaseSSL->getValue();
-        
         $this->logger->debug("Database SSL setting: {$sslSetting}");
-        
-        switch ($sslSetting) {
-            case 'enabled':
-                $this->logger->debug("SSL explicitly enabled via plugin setting");
-                return true;
-                
-            case 'disabled':
-                $this->logger->debug("SSL explicitly disabled via plugin setting");
-                return false;
-                
-            case 'auto':
-            default:
-                // Auto-detect based on Matomo config and network context
-                $generalConfig = \Piwik\Config::getInstance()->General;
-                
-                // Check Matomo's SSL-related settings
-                if (!empty($generalConfig['assume_secure_protocol']) && $generalConfig['assume_secure_protocol'] == 1) {
-                    $this->logger->debug("assume_secure_protocol enabled, using SSL");
-                    return true;
-                }
-                
-                if (!empty($generalConfig['force_ssl']) && $generalConfig['force_ssl'] == 1) {
-                    $this->logger->debug("force_ssl enabled, using SSL");
-                    return true;
-                }
-                
-                // Fallback: disable SSL for internal networks
-                if ($this->isInternalNetwork($host)) {
-                    $this->logger->debug("Auto-detect: Internal network, disabling SSL");
-                    return false;
-                }
-                
-                $this->logger->debug("Auto-detect: External network, enabling SSL");
-                return true;
+
+        if ($sslSetting === 'enabled') {
+            return false;
         }
+        if ($sslSetting === 'disabled') {
+            return true;
+        }
+        if (!empty($dbConfig['enable_ssl'])) {
+            return false;
+        }
+        if (!empty($dbConfig['unix_socket'])
+            || (isset($dbConfig['port']) && is_string($dbConfig['port']) && strpos($dbConfig['port'], '/') === 0)
+        ) {
+            return true;
+        }
+        return $this->isInternalNetwork((string) ($dbConfig['host'] ?? 'localhost'));
     }
 
-    private function getMysqlDumpSslOption() {
-        // Check mysqldump version to determine which SSL option to use
-        exec('mysqldump --version 2>&1', $versionOutput, $returnVar);
-        $versionString = implode(' ', $versionOutput);
-
-        $this->logger->debug('mysqldump version: ' . $versionString);
-
-        // Check if it's MariaDB
-        if (stripos($versionString, 'mariadb') !== false) {
-            $this->logger->debug('Detected MariaDB, using --skip-ssl');
-            return '--skip-ssl';
+    /**
+     * Returns the dump method that will be used.
+     *
+     * @param string|null $requested auto, mysqldump or php. Defaults to the plugin setting.
+     * @throws \Exception when mysqldump is explicitly requested but not available
+     */
+    public function resolveDumpMethod(?string $requested = null): string {
+        $method = $requested;
+        if (empty($method)) {
+            $settings = new SystemSettings();
+            $method = $settings->dataExportDumpMethod->getValue() ?: self::METHOD_AUTO;
         }
 
-        // Extract version number for MySQL (e.g., "8.0.33" from the output)
-        preg_match('/(\d+)\.(\d+)\.(\d+)/', $versionString, $matches);
+        if ($method === self::METHOD_PHP) {
+            return self::METHOD_PHP;
+        }
 
-        if (!empty($matches)) {
-            $majorVersion = (int)$matches[1];
-            $minorVersion = (int)$matches[2];
+        $mysqldump = MysqlCli::findDump();
 
-            // MySQL 5.7.5+ supports --ssl-mode
-            if ($majorVersion >= 8 || ($majorVersion == 5 && $minorVersion >= 7)) {
-                $this->logger->debug('Detected MySQL 5.7+, using --ssl-mode=DISABLED');
-                return '--ssl-mode=DISABLED';
+        if ($method === self::METHOD_MYSQLDUMP) {
+            if (!$mysqldump) {
+                throw new \Exception('mysqldump (or mariadb-dump) was not found or exec() is disabled. '
+                    . 'Choose the "PHP" or "Auto" backup method instead.');
             }
+            return self::METHOD_MYSQLDUMP;
         }
 
-        // Fall back to older --ssl option for older MySQL versions
-        $this->logger->debug('Using legacy --ssl=0 option');
-        return '--ssl=0';
+        if ($method !== self::METHOD_AUTO) {
+            throw new \Exception("Unknown backup method '$method'. Use auto, mysqldump or php.");
+        }
+
+        return $mysqldump ? self::METHOD_MYSQLDUMP : self::METHOD_PHP;
     }
 
-    public function generateDump($downloadPreference = 'none', $dumpPath = null) {
+    /**
+     * Human readable description of how backups will be made, for the UI.
+     */
+    public function getDumpMethodStatus(): array {
+        $settings = new SystemSettings();
+        $configured = $settings->dataExportDumpMethod->getValue() ?: self::METHOD_AUTO;
+        $mysqldump = MysqlCli::findDump();
+        try {
+            $method = $this->resolveDumpMethod();
+            $error = null;
+        } catch (\Exception $e) {
+            $method = null;
+            $error = $e->getMessage();
+        }
+        return [
+            'configured' => $configured,
+            'method' => $method,
+            'mysqldump' => $mysqldump ? $mysqldump['version'] : null,
+            'canExec' => MysqlCli::canExec(),
+            'error' => $error,
+        ];
+    }
+
+    /**
+     * Dumps the whole database.
+     *
+     * @param string $downloadPreference none, zip or tar
+     * @param string|null $dumpPath Full path of the .sql file, defaults to the backup folder
+     * @param string|null $method auto, mysqldump or php. Defaults to the plugin setting.
+     * @return string Path of the (compressed) dump
+     */
+    public function generateDump($downloadPreference = 'none', $dumpPath = null, $method = null) {
         $this->logger->debug('Generating database dump...');
         $this->logger->debug('Download preference: ' . $downloadPreference);
         $this->logger->debug('Dump path: ' . $dumpPath);
-        $dbConfig = $this->getDbConfig();
-        $dbName = $dbConfig['dbname'];
-        $dbUser = $dbConfig['username'];
-        $dbPassword = $dbConfig['password'];
-        $dbHost = $dbConfig['host'];
-        $dbPort = isset($dbConfig['port']) ? $dbConfig['port'] : 3306;
 
         // Make sure the backup directory exists
-        if (!$this->fileService->ensure_directory_exists($this->backupDir)) {
+        if ($this->fileService->ensure_directory_exists($this->backupDir) !== true) {
             throw new \Exception("Failed to create backup directory.");
         }
 
-        $fullPath = $this->backupDir . 'dbdump-' . date('Y-m-d_H-i-s') . '.sql';
-        if ($dumpPath) {
-            $fullPath = $dumpPath;
+        $fullPath = $dumpPath ?: $this->backupDir . 'dbdump-' . date('Y-m-d_H-i-s') . '.sql';
+
+        $configuredMethod = $method ?: null;
+        $method = $this->resolveDumpMethod($configuredMethod);
+        $this->logger->info('Backup method: ' . $method);
+
+        if ($method === self::METHOD_MYSQLDUMP) {
+            try {
+                $this->runMysqldump($fullPath);
+            } catch (\Exception $e) {
+                $settings = new SystemSettings();
+                $isAuto = ($configuredMethod ?: ($settings->dataExportDumpMethod->getValue() ?: self::METHOD_AUTO)) === self::METHOD_AUTO;
+                if (!$isAuto) {
+                    throw $e;
+                }
+                $this->logger->notice('mysqldump failed, falling back to the PHP backup method: ' . $e->getMessage());
+                $this->runPhpDump($fullPath);
+            }
+        } else {
+            $this->runPhpDump($fullPath);
         }
 
+        return $this->fileService->compressDump($fullPath, $downloadPreference);
+    }
 
-        $this->logger->debug('Args: ' . json_encode([
-            'dbUser' => $dbUser,
-            'dbHost' => $dbHost,
-            'dbName' => $dbName,
-            'fullPath' => $fullPath,
-        ]));
+    private function runPhpDump(string $fullPath): void {
+        $db = DbConnectionFactory::create(true);
+        try {
+            $dumper = new PhpSqlDumper($db, $this->logger);
+            $dumper->dumpDatabase($fullPath);
+        } finally {
+            $db->closeConnection();
+        }
+    }
 
-        $debug_version="mysqldump --version";
-        exec($debug_version, $output_version, $returnVar_version);
-        $this->logger->debug('mysqldump version output: ' . implode("\n", $output_version));
+    /**
+     * Base mysqldump command (binary, SSL and connection options).
+     */
+    private function getMysqldumpCommand(array $dbConfig): string {
+        $mysqldump = MysqlCli::findDump();
+        if (!$mysqldump) {
+            throw new \Exception('mysqldump not available.');
+        }
+        $this->logger->debug('mysqldump version: ' . $mysqldump['version']);
 
         $sslOption = '';
-        if ($this->shouldUseSSL($dbHost)) {
-            // Depending on your MySQL version and configuration, you might need to adjust the SSL options.
-            # --ssl-mode=DISABLED
-            # --ssl-mode=PREFERRED
-            # --ssl-mode=REQUIRED
-            # --ssl=0
-            // Get appropriate SSL option
-            $sslOption = $this->getMysqlDumpSslOption();
-            $this->logger->debug('Using SSL option for mysqldump: ' . $sslOption);
+        if ($this->shouldDisableSsl($dbConfig)) {
+            $sslOption = MysqlCli::disableSslOption($mysqldump['version']);
+            $this->logger->debug('Disabling SSL for mysqldump: ' . $sslOption);
         }
+
+        // --single-transaction: consistent InnoDB snapshot without locking tables (tracking keeps working)
+        // --quick: stream rows instead of buffering whole tables in memory
+        // --no-tablespaces: avoids needing the PROCESS privilege on MySQL 8.0.21+
+        return sprintf(
+            '%s --single-transaction --quick --no-tablespaces --default-character-set=utf8mb4 %s %s',
+            escapeshellarg($mysqldump['binary']),
+            $sslOption,
+            MysqlCli::connectionArgs($dbConfig)
+        );
+    }
+
+    private function runMysqldump(string $fullPath): void {
+        $dbConfig = $this->getDbConfig();
 
         $command = sprintf(
-            'mysqldump %s -u %s -h%s -P %d %s > %s',
-            $sslOption,
-            escapeshellarg($dbUser),
-            escapeshellarg($dbHost),
-            $dbPort,
-            escapeshellarg($dbName),
+            '%s %s 2>&1 > %s',
+            $this->getMysqldumpCommand($dbConfig),
+            escapeshellarg($dbConfig['dbname']),
             escapeshellarg($fullPath)
         );
+        $this->logger->debug('Dump command: ' . $command);
 
-        putenv('MYSQL_PWD=' . $dbPassword);
-        exec($command, $output, $returnVar);
-        putenv('MYSQL_PWD');
-
+        [$returnVar, $output] = MysqlCli::run($command, (string) $dbConfig['password']);
         if ($returnVar !== 0) {
-            throw new \Exception("Failed to generate database dump.");
+            @unlink($fullPath);
+            throw new \Exception("Failed to generate database dump with mysqldump: " . implode("\n", $output));
         }
-
-        $fullPath = $this->fileService->compressDump($fullPath, $downloadPreference);
-
-        return $fullPath;
     }
 
     /**
@@ -279,129 +326,143 @@ class DatabaseDumpService {
         $startDate = Date::factory($date, null)->setTime('00:00:00')->toString('Y-m-d H:i:s');
         $endDate = Date::factory($date, null)->setTime('23:59:59')->toString('Y-m-d H:i:s');
 
-        // SQL query with positional parameters
         $sql = "SELECT MIN(idaction_url) AS min_idaction
                 FROM " . Common::prefixTable('log_link_visit_action') . "
                 WHERE server_time >= ?
                 AND server_time <= ?";
 
-        // Provide parameters in the correct order
-        $parameters = [$startDate, $endDate];
-
-        // Execute query and fetch the result
-        $minId = $this->db->fetchOne($sql, $parameters);
-
-        return $minId;
+        return $this->db->fetchOne($sql, [$startDate, $endDate]);
     }
 
+    /**
+     * Builds the WHERE condition for one log table. All values are validated,
+     * so the condition is safe to pass to mysqldump --where and PhpSqlDumper.
+     *
+     * @param string $table unprefixed table name
+     * @param string|null $date YYYY-MM-DD
+     * @param int[] $siteIds
+     */
+    private function getLogTableWhere(string $table, ?string $date, array $siteIds): ?string {
+        if ($table === 'log_action') {
+            // log_action has no date column: only dump actions from the first one
+            // used on that day onwards.
+            if (!$date) {
+                return null;
+            }
+            $minId = $this->getLogActionMinId($date);
+            return $minId ? 'idaction >= ' . (int) $minId : null;
+        }
 
-    public function generateLogDumps($downloadPreference = 'none', $dumpPath = null, $tables = null, $date = null, $siteIds = null) {
-        $this->logger->debug('Generating database dump...');
+        if (!isset(self::LOG_TABLE_DATE_COLUMNS[$table])) {
+            return null;
+        }
+
+        $conditions = [];
+        if ($date) {
+            $conditions[] = sprintf(
+                "%s BETWEEN '%s 00:00:00' AND '%s 23:59:59'",
+                self::LOG_TABLE_DATE_COLUMNS[$table],
+                $date,
+                $date
+            );
+        }
+        if (!empty($siteIds)) {
+            $conditions[] = 'idsite IN (' . implode(',', $siteIds) . ')';
+        }
+        return $conditions ? implode(' AND ', $conditions) : null;
+    }
+
+    /**
+     * Dumps log tables, optionally filtered by date and sites, into one file.
+     *
+     * @param string $downloadPreference none, zip or tar
+     * @param string|null $dumpPath Full path of the .sql file, defaults to the backup folder
+     * @param string|null $tables comma separated, unprefixed table names
+     * @param string|null $date YYYY-MM-DD
+     * @param string|null $siteIds comma separated site IDs
+     * @param string|null $method auto, mysqldump or php
+     */
+    public function generateLogDumps($downloadPreference = 'none', $dumpPath = null, $tables = null, $date = null, $siteIds = null, $method = null) {
+        $this->logger->debug('Generating log dumps...');
         $this->logger->debug('Download preference: ' . $downloadPreference);
         $this->logger->debug('Dump path: ' . $dumpPath);
         $this->logger->debug('Tables: ' . $tables);
         $this->logger->debug('Date: ' . $date);
         $this->logger->debug('Site IDs: ' . $siteIds);
-    
-        $dbConfig = $this->getDbConfig();
-        $dbName = $dbConfig['dbname'];
-        $dbUser = $dbConfig['username'];
-        $dbPassword = $dbConfig['password'];
-        $dbHost = $dbConfig['host'];
-        $dbPort = isset($dbConfig['port']) ? $dbConfig['port'] : 3306;
-    
+
+        if ($date && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new \Exception("Invalid date '$date', expected YYYY-MM-DD.");
+        }
+
+        $siteIdList = [];
+        if ($siteIds !== null && $siteIds !== '') {
+            foreach (explode(',', $siteIds) as $siteId) {
+                $siteId = trim($siteId);
+                if (!ctype_digit($siteId)) {
+                    throw new \Exception("Invalid site ID '$siteId'.");
+                }
+                $siteIdList[] = (int) $siteId;
+            }
+        }
+
+        $tables = $tables ?: 'log_visit,log_link_visit_action,log_action,log_conversion,log_conversion_item';
+        $tableWheres = [];
+        foreach (explode(',', $tables) as $table) {
+            $table = trim($table);
+            if ($table === '') {
+                continue;
+            }
+            if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+                throw new \Exception("Invalid table name '$table'.");
+            }
+            $tableWheres[Common::prefixTable($table)] = $this->getLogTableWhere($table, $date, $siteIdList);
+        }
+
         // Make sure the backup directory exists
-        if (!$this->fileService->ensure_directory_exists($this->backupDir)) {
+        if ($this->fileService->ensure_directory_exists($this->backupDir) !== true) {
             throw new \Exception("Failed to create backup directory.");
         }
-    
-        $tablesArray = explode(',', $tables);
-    
-        $dumpCommands = [];
-        foreach ($tablesArray as $i => $table) {
-            $table = trim($table);
-            $table = Common::prefixTable($table);
 
-            // Handle other tables with direct date and site ID filtering
-            $whereCondition = [];
-            if (in_array($table, [Common::prefixTable('log_visit')])) {
-                $dateTimeCol = 'visit_first_action_time';
-            } elseif (in_array($table, [Common::prefixTable('log_link_visit_action'), Common::prefixTable('log_conversion'), Common::prefixTable('log_conversion_item')])) {
-                $dateTimeCol = 'server_time';
-            } else {
-                $dateTimeCol = null;
+        $fullPath = $dumpPath ?: $this->backupDir . 'logdump-' . ($date ?: 'all') . '-' . date('Y-m-d_H-i-s') . '.sql';
+
+        $method = $this->resolveDumpMethod($method);
+        $this->logger->info('Backup method: ' . $method);
+
+        if ($method === self::METHOD_PHP) {
+            $db = DbConnectionFactory::create(true);
+            try {
+                $dumper = new PhpSqlDumper($db, $this->logger);
+                $dumper->dumpTables($fullPath, $tableWheres, (bool) $dumpPath && file_exists($fullPath));
+            } finally {
+                $db->closeConnection();
             }
+        } else {
+            $dbConfig = $this->getDbConfig();
+            $baseCommand = $this->getMysqldumpCommand($dbConfig);
+            $first = true;
+            foreach ($tableWheres as $table => $where) {
+                // Example:
+                // mysqldump --skip-add-drop-table -u root -h localhost matomo matomo_log_action --where="idaction >= 123" >> /path/to/dump.sql
+                $command = sprintf(
+                    '%s --skip-add-drop-table %s %s %s 2>&1 %s %s',
+                    $baseCommand,
+                    $where ? escapeshellarg('--where=' . $where) : '',
+                    escapeshellarg($dbConfig['dbname']),
+                    escapeshellarg($table),
+                    ($first && !$dumpPath) ? '>' : '>>',
+                    escapeshellarg($fullPath)
+                );
+                $first = false;
+                $this->logger->debug('Dump command: ' . $command);
 
-            if ($dateTimeCol) {
-                if ($date) {
-                    $whereCondition[] = sprintf("%s BETWEEN '%s 00:00:00' AND '%s 23:59:59'", $dateTimeCol, $date, $date);
+                [$returnVar, $output] = MysqlCli::run($command, (string) $dbConfig['password']);
+                if ($returnVar !== 0) {
+                    throw new \Exception("Failed to dump table $table with mysqldump: " . implode("\n", $output));
                 }
-                if ($siteIds) {
-                    $whereCondition[] = 'idsite IN (' . $siteIds . ')';
-                }
-                $whereClause = implode(' AND ', $whereCondition);
-                $whereCondition = $whereClause ? '--where="' . $whereClause . '"' : '';
-            }
-
-            // Handle log_action separately due to lack of date columns
-            // Query the first idaction_url from matomo_log_link_visit_action
-            // that we can use as a filter for matomo_log_action
-            if ($table == Common::prefixTable('log_action')) {
-                $minId = $this->getLogActionMinId($date);
-                $whereCondition = $minId ? '--where="idaction > ' . $minId . '"' : '';
-            }
-
-            $fullPath = $this->backupDir . $table . '-' . date('Y-m-d_H-i') . '.sql';
-            if ($dumpPath) {
-                $fullPath = $dumpPath;
-            }
-
-            $sslOption = '';
-            if ($this->shouldUseSSL($dbHost)) {
-                // Depending on your MySQL version and configuration, you might need to adjust the SSL options.
-                # --ssl-mode=DISABLED
-                # --ssl-mode=PREFERRED
-                # --ssl-mode=REQUIRED
-                # --ssl=0
-                // Get appropriate SSL option
-                $sslOption = $this->getMysqlDumpSslOption();
-                $this->logger->debug('Using SSL option for mysqldump: ' . $sslOption);
-            }
-
-            // Example:
-            // mysqldump --skip-add-drop-table -u root -h localhost matomo matomo_log_action --where="idaction > 123" >> /path/to/dump.sql
-            $command = sprintf(
-                'mysqldump --skip-add-drop-table %s -u %s -h%s -P %d %s %s %s >> %s',
-                $sslOption,
-                escapeshellarg($dbUser),
-                escapeshellarg($dbHost),
-                $dbPort,
-                escapeshellarg($dbName),
-                escapeshellarg($table),
-                $whereCondition,
-                escapeshellarg($fullPath)
-            );
-            $dumpCommands[] = $command;
-            $this->logger->debug('Dump command: ' . $command);
-        }
-    
-        putenv('MYSQL_PWD=' . $dbPassword);
-        foreach ($dumpCommands as $command) {
-            exec($command, $output, $returnVar);
-            if ($returnVar !== 0) {
-                putenv('MYSQL_PWD');
-                throw new \Exception("Failed to generate database dump for command: $command.");
             }
         }
-        putenv('MYSQL_PWD');
-    
-        if ($returnVar !== 0) {
-            throw new \Exception("Failed to generate database dump.");
-        }
-    
-        $fullPath = $this->fileService->compressDump($fullPath, $downloadPreference);
-    
-        return $fullPath;
+
+        return $this->fileService->compressDump($fullPath, $downloadPreference);
     }
 
     /**

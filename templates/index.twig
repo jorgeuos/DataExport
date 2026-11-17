@@ -7,11 +7,16 @@
 			This plugin helps you to Backup and export your database, and also to restore it.
 		</p>
 		<p>
-			Make sure your DB user has Process tables privileges.
-<pre>
-GRANT PROCESS ON {{dbName}}.* TO '{{dbUser}}'@'YOUR_HOST_OR_%';
-FLUSH PRIVILEGES;
-</pre>
+			<b>Backup method:</b>
+			{% if dumpMethod.error %}
+				<span style="color:#d4291f">{{ dumpMethod.error }}</span>
+			{% elseif dumpMethod.method == 'mysqldump' %}
+				mysqldump ({{ dumpMethod.mysqldump }})
+			{% else %}
+				Built-in PHP dumper{% if dumpMethod.configured == 'auto' %} (mysqldump {% if dumpMethod.canExec %}was not found{% else %}can't run because exec() is disabled{% endif %}){% endif %}
+			{% endif %}
+			<br>
+			<small>Change it under <a href="index.php?module=CoreAdminHome&amp;action=generalSettings#/DataExport">General settings &rsaquo; DataExport</a>. Both methods create a standard .sql file that can be imported with the mysql client or with the import below.</small>
 		</p>
 		<p>
 			<form action="{{ linkTo({'action': 'downloadDbDump'}) }}" method="post">
@@ -153,6 +158,6 @@ FLUSH PRIVILEGES;
 
 	<div vue-entry="CoreHome.ContentBlock" content-title="{{ settings }}" rate="true">
 		Link to the settings page:
-		<a href="index.php?module=CoreAdminHome&amp;action=generalSettings&amp;idSite=1&amp;period=day&amp;date=yesterday#/DataExport" title="Settings">Settings</a>
+		<a href="index.php?module=CoreAdminHome&amp;action=generalSettings#/DataExport" title="Settings">Settings</a>
 	</div>
 {% endblock %}

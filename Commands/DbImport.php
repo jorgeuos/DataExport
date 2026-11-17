@@ -25,10 +25,16 @@ class DbImport extends ConsoleCommand {
      */
     protected function configure() {
         $this->setName('db:import');
-        $this->setDescription('DbImport');
+        $this->setDescription('Imports a SQL dump (.sql or .sql.gz) into the Matomo database.');
         $this->addRequiredArgument(
             'filename',
             'The name of the import'
+        );
+        $this->addOptionalValueOption(
+            'method',
+            'm',
+            'Import method: auto, mysql or php. auto uses the mysql client when installed, otherwise PHP.',
+            'auto'
         );
         $this->addNegatableOption(
             'force',
@@ -55,7 +61,12 @@ class DbImport extends ConsoleCommand {
         $output->writeln($message);
 
         $service = new DatabaseImportService();
-        $success = $service->importDump($filename);
+        try {
+            $success = $service->importDump($filename, $input->getOption('method'));
+        } catch (\Exception $e) {
+            $output->writeln('<error>' . $e->getMessage() . '</error>');
+            return self::FAILURE;
+        }
         if ($success) {
             $output->writeln('<info>DB imported successfully</info>');
             return self::SUCCESS;

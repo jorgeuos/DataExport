@@ -26,13 +26,18 @@ class DumpLogs extends ConsoleCommand
         $this->addOptionalValueOption(
             'dest',
             'd',
-            'Default destination $MATOMO_ROOT/tmp/de_backups/{dbdump}-{Y-m-d_H-i-s}.sql'
+            'Default destination $MATOMO_ROOT/tmp/de_backups/logdump-{date}-{Y-m-d_H-i-s}.sql'
         );
         $this->addOptionalValueOption(
             'compress',
             'c',
             'Whether to compress the dump file as a .zip or .tar.gz archive. Defaults to none.',
             'none'
+        );
+        $this->addOptionalValueOption(
+            'method',
+            'm',
+            'Backup method: auto, mysqldump or php. Defaults to the plugin setting (auto: mysqldump when installed, otherwise PHP).'
         );
         $this->addNegatableOption(
             'sync',
@@ -138,7 +143,7 @@ class DumpLogs extends ConsoleCommand
 
         try {
             $service = new DatabaseDumpService();
-            $dumpPath = $service->generateLogDumps($compress, $dest, $tables, $date, $siteIds);
+            $dumpPath = $service->generateLogDumps($compress, $dest, $tables, $date, $siteIds, $input->getOption('method'));
 
             $logger->info('Dumps generated at: ' . $dumpPath);
         } catch (\Exception $e) {

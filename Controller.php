@@ -52,6 +52,8 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
         $files = $fileService->getFilesInBackupDir();
         $settingsHelper = new SettingsHelper();
         $settings = $settingsHelper->getDataExportSettings();
+        $dumpService = new DatabaseDumpService();
+        $dumpMethod = $dumpService->getDumpMethodStatus();
 
         // Render the Twig template templates/index.twig and assign the view variable answerToLife to the view.
         return $this->renderTemplate(
@@ -72,6 +74,7 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
                 'settings' => Piwik::translate('DataExport_Settings'),
                 'autoDump' => 'none',
                 'csvQuery' => $this->getCsvQueryExample(),
+                'dumpMethod' => $dumpMethod,
                 'nonceDump' => Nonce::getNonce(self::NONCE_DUMP),
                 'nonceUpload' => Nonce::getNonce(self::NONCE_UPLOAD),
                 'nonceDelete' => Nonce::getNonce(self::NONCE_DELETE),
@@ -191,15 +194,9 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
 
             if (move_uploaded_file($fileTmpPath, $destPath)) {
                 // Validate file content
-                $handle = fopen($destPath, "r");
-                if ($handle) {
-                    $firstLine = fgets($handle);
-                    if (!preg_match('/^-- (MariaDB|MySQL) dump \d+/', $firstLine)) {
-                        throw new \Exception("File does not appear to be a valid MySQL dump.");
-                    }
-                    fclose($handle);
-                } else {
-                    throw new \Exception("Unable to read uploaded file.");
+                if (!$this->looksLikeSqlDump($destPath)) {
+                    @unlink($destPath);
+                    throw new \Exception("File does not appear to be a valid MySQL dump.");
                 }
                 $service = new DatabaseImportService();
                 try {
@@ -224,6 +221,29 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
         } else {
             throw new \Exception("No file uploaded.");
         }
+    }
+
+    /**
+     * Checks the first lines for a mysqldump, mariadb-dump or DataExport PHP dump header.
+     * MariaDB 11+ writes a "/*!999999\- enable the sandbox mode *\/" line first.
+     */
+    private function looksLikeSqlDump(string $path): bool {
+        $handle = @fopen($path, 'r');
+        if (!$handle) {
+            throw new \Exception("Unable to read uploaded file.");
+        }
+        try {
+            for ($i = 0; $i < 5 && ($line = fgets($handle)) !== false; $i++) {
+                if (preg_match('/^-- (MariaDB|MySQL) dump \d+/', $line)
+                    || strpos($line, \Piwik\Plugins\DataExport\Services\Dump\PhpSqlDumper::HEADER_SIGNATURE) === 0
+                ) {
+                    return true;
+                }
+            }
+        } finally {
+            fclose($handle);
+        }
+        return false;
     }
 
     public function selectAllVisitsAndActions() {
