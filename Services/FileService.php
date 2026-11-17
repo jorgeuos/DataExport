@@ -37,7 +37,7 @@ class FileService {
     /**
      * Constructor.
      */
-    public function __construct(LoggerInterface $logger = null) {
+    public function __construct(?LoggerInterface $logger = null) {
         $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
         $this->backupDir = PIWIK_USER_PATH . '/tmp/de_backups/';
         $this->settings = new SystemSettings();

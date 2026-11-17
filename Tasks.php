@@ -25,7 +25,7 @@ class Tasks extends \Piwik\Plugin\Tasks
      */
     protected $logger;
 
-    public function __construct(LoggerInterface $logger = null) {
+    public function __construct(?LoggerInterface $logger = null) {
         $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
         $this->settings = new SystemSettings();
     }
