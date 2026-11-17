@@ -139,7 +139,15 @@ class Stream
     protected function parse_path($path)
     {
         $orig = $path;
-        extract(parse_url($path) + ['port' => 22]);
+        $url = parse_url($path) + ['port' => 22];
+
+        $keys = ['scheme', 'host', 'port', 'user', 'pass', 'path', 'query', 'fragment'];
+        foreach ($keys as $key) {
+            if (isset($url[$key])) {
+                $$key = $url[$key];
+            }
+        }
+
         if (isset($query)) {
             $path .= '?' . $query;
         } elseif (preg_match('/(\?|\?#)$/', $orig)) {
@@ -169,9 +177,9 @@ class Stream
             }
             $this->sftp = $host;
         } else {
-            if (isset($this->context)) {
-                $context = stream_context_get_options($this->context);
-            }
+            $context = isset($this->context) ?
+                stream_context_get_options($this->context) :
+                stream_context_get_options(stream_context_get_default());
             if (isset($context[$scheme]['session'])) {
                 $sftp = $context[$scheme]['session'];
             }
@@ -307,7 +315,7 @@ class Stream
             call_user_func($this->notification, STREAM_NOTIFY_PROGRESS, STREAM_NOTIFY_SEVERITY_INFO, '', 0, strlen($result), $this->size);
         }
 
-        if (empty($result)) { // ie. false or empty string
+        if ($result === false || $result === '') {
             $this->eof = true;
             return false;
         }
