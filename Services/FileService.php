@@ -37,7 +37,7 @@ class FileService {
     /**
      * Constructor.
      */
-    public function __construct(LoggerInterface $logger = null) {
+    public function __construct(?LoggerInterface $logger = null) {
         $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
         $this->backupDir = PIWIK_USER_PATH . '/tmp/de_backups/';
         $this->settings = new SystemSettings();
@@ -109,6 +109,9 @@ class FileService {
             return $this->zipDump($dumpPath);
         } elseif ($compress == 'tar') {
             return $this->tarDump($dumpPath);
+        } elseif ($compress == 'gzip') {
+            // Already written compressed by the dumper
+            return $dumpPath;
         } else {
             return $dumpPath;
         }
@@ -131,8 +134,8 @@ class FileService {
      */
     public function cleanBackupsFolder($force = null) {
         $this->logger->info("Run cleanup task");
-        $backupFolder = $this->backupDir;
-        $filePatterns = ['*.sql', '*.zip', '*.tar.gz'];
+        $backupFolder = $this->getBackupDir();
+        $filePatterns = ['*.sql', '*.sql.gz', '*.zip', '*.tar.gz', '*.csv'];
         $daysOld = 7;
 
         // Calculate the threshold date/time for deletion
@@ -249,7 +252,10 @@ class FileService {
             ];
         }
         $ignoreFiles = ['.', '..', '.gitignore', '.DS_Store'];
-        $files = array_diff(scandir($path), $ignoreFiles);
+        $files = array_filter(array_diff(scandir($path), $ignoreFiles), function ($file) {
+            // Hidden files, e.g. the backup job status file
+            return $file[0] !== '.';
+        });
         $size = 0;
         foreach ($files as $file) {
             $size += filesize($path . $file);
@@ -261,11 +267,41 @@ class FileService {
         ];
     }
 
-    public  function deleteFiles($files) {
-        $path = $this->getBackupDir();
-        foreach ($files as $file) {
-            $filePath = $path . $file;
-            if (file_exists($filePath)) {
+    /**
+     * Resolves a file name to a file inside the backup folder.
+     *
+     * Only the base name is used, so paths like ../../config/config.ini.php
+     * can't escape the backup folder.
+     *
+     * @return string|null Full path, or null if there is no such readable file.
+     */
+    public function resolveBackupFile($fileName) {
+        if (!is_string($fileName)) {
+            return null;
+        }
+        $fileName = basename(str_replace('\\', '/', $fileName));
+        if ($fileName === '' || $fileName === '.' || $fileName === '..' || $fileName[0] === '.') {
+            return null;
+        }
+        $dir = realpath($this->getBackupDir());
+        if ($dir === false) {
+            return null;
+        }
+        $filePath = realpath($dir . DIRECTORY_SEPARATOR . $fileName);
+        if ($filePath === false
+            || dirname($filePath) !== $dir
+            || !is_file($filePath)
+            || !is_readable($filePath)
+        ) {
+            return null;
+        }
+        return $filePath;
+    }
+
+    public function deleteFiles($files) {
+        foreach ((array) $files as $file) {
+            $filePath = $this->resolveBackupFile($file);
+            if ($filePath) {
                 unlink($filePath);
             }
         }

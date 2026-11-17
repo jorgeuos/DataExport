@@ -1,5 +1,30 @@
 ## Changelog
 
+1.2.0
+- New: backups work without mysqldump. A built-in PHP dumper is used automatically when
+  mysqldump/mariadb-dump isn't installed or exec() is disabled, or when mysqldump fails.
+  New "Backup method" setting (auto, mysqldump, php) and --method option for db:dump,
+  db:dump-logs and db:import.
+- New: imports work without the mysql client, and db:import and the upload form read .sql.gz files.
+- New: backups from the admin page run in the background, so large databases no longer hit
+  web server timeouts. The page shows progress and downloads the file when it is ready.
+- New: "gzip" compression writes .sql.gz while dumping, much faster than zip/tar.gz for large
+  databases. Default for the admin page.
+- Prefer mariadb-dump/mariadb over the deprecated mysqldump/mysql names on MariaDB 11.
+- Fixed: exports with a custom table prefix failed with "Table 'matomo_log_visit' doesn't exist" (#7).
+- Fixed: CSV export returned empty idvisit/idsite for visits without conversions. Visitor IDs
+  and IPs are now exported as readable values.
+- Fixed: vendor autoload path in the plugin class (#4).
+- Fixed: weekly automatic dumps ran every day.
+- Fixed: the database SSL setting was inverted for mysqldump ("enabled" disabled SSL).
+- Fixed: dataexport:csv ignored the site, added --idsite.
+- Fixed: backup cleanup ignored a custom backup path and CSV files.
+- Security: CSRF protection for the dump, import and delete forms; downloads and deletes are
+  limited to the backup folder.
+- mysqldump now runs with --single-transaction --quick --no-tablespaces (no table locks,
+  no PROCESS privilege needed) and supports socket connections. Errors are logged.
+- Supports MariaDB 11 dumps (sandbox mode line) in the import form.
+
 
 1.1.10
 - Added disabable ssl option to mysqldump command and added some missing translations.

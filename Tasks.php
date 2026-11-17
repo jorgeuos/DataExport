@@ -25,7 +25,7 @@ class Tasks extends \Piwik\Plugin\Tasks
      */
     protected $logger;
 
-    public function __construct(LoggerInterface $logger = null) {
+    public function __construct(?LoggerInterface $logger = null) {
         $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
         $this->settings = new SystemSettings();
     }
@@ -34,9 +34,11 @@ class Tasks extends \Piwik\Plugin\Tasks
     {
         $this->daily('cleanBackupsFolderTask', null, self::LOWEST_PRIORITY);
 
-        $this->daily('databaseDumpTask', null, self::NORMAL_PRIORITY);
+        // Separate task methods: scheduling the same method twice made the
+        // daily schedule also run "weekly" dumps every day.
+        $this->daily('dailyDatabaseDumpTask', null, self::NORMAL_PRIORITY);
 
-        $this->weekly('databaseDumpTask', null, self::NORMAL_PRIORITY);
+        $this->weekly('weeklyDatabaseDumpTask', null, self::NORMAL_PRIORITY);
 
     }
 
@@ -60,16 +62,28 @@ class Tasks extends \Piwik\Plugin\Tasks
         $this->logger->info('Dump generated at: ' . $dumpPath);
     }
 
-    public function databaseDumpTask()
+    public function dailyDatabaseDumpTask()
     {
-        $this->logger->info('Starting database dump task');
         if ($this->settings->dataExportAutoDump->getValue() === 'daily') {
-            $this->logger->info('Daily database dump task');
-            $this->runDatabaseDump();
-        } elseif ($this->settings->dataExportAutoDump->getValue() === 'weekly') {
-            $this->logger->info('Weekly database dump task');
+            $this->logger->info('Starting daily database dump task');
             $this->runDatabaseDump();
         }
+    }
+
+    public function weeklyDatabaseDumpTask()
+    {
+        if ($this->settings->dataExportAutoDump->getValue() === 'weekly') {
+            $this->logger->info('Starting weekly database dump task');
+            $this->runDatabaseDump();
+        }
+    }
+
+    /**
+     * @deprecated Kept so a task scheduled by an older version still resolves.
+     */
+    public function databaseDumpTask()
+    {
+        $this->dailyDatabaseDumpTask();
     }
 
 }

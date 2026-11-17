@@ -7,7 +7,7 @@
  * Description: Export database or connect to your BI tools.
  * Author: Jorgeuos
  * Author URI: https://jorgeuos.com
- * Version: 1.1.9
+ * Version: 1.2.0
  * @link https://jorgeuos.com
  * @license http://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
@@ -26,8 +26,10 @@ class DataExport extends \Piwik\Plugin {
 
     public function onInit()
     {
-        if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
-            require_once __DIR__ . '/../vendor/autoload.php';
+        // Use __DIR__ so this also works when Matomo runs inside WordPress
+        // (https://github.com/jorgeuos/DataExport/issues/4)
+        if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+            require_once __DIR__ . '/vendor/autoload.php';
         }
     }
 

@@ -9,6 +9,9 @@
 namespace Piwik\Plugins\DataExport\Services;
 
 use Piwik\Plugins\DataExport\Services\FileService;
+use Piwik\Plugins\DataExport\Services\Dump\DbConnectionFactory;
+use Piwik\Plugins\DataExport\Services\Dump\MysqlCli;
+use Piwik\Plugins\DataExport\Services\Dump\SqlImporter;
 use Piwik\Container\StaticContainer;
 use Psr\Log\LoggerInterface;
 
@@ -49,33 +52,52 @@ class DatabaseImportService
     }
 
     /**
-     * Import a database dump.
+     * Import a database dump (.sql or .sql.gz).
+     *
+     * @param string $dumpPath
+     * @param string|null $method auto, mysql or php. auto uses the mysql
+     *                            client when installed, otherwise PHP.
      */
-    public function importDump($dumpPath)
+    public function importDump($dumpPath, $method = 'auto')
     {
-        $dbConfig = $this->dbConfig;
-        $dbName = $dbConfig['dbname'];
-        $dbUser = $dbConfig['username'];
-        $dbPassword = $dbConfig['password'];
-        $dbHost = $dbConfig['host'];
-
         if (!file_exists($dumpPath) || !is_readable($dumpPath)) {
             throw new \Exception("The file does not exist or is not readable.");
         }
 
+        $method = $method ?: 'auto';
+        $client = MysqlCli::findClient();
+        $isGzip = substr(strtolower($dumpPath), -3) === '.gz';
+
+        if ($method === 'mysql' && !$client) {
+            throw new \Exception('The mysql (or mariadb) client was not found or exec() is disabled. Use the php import method instead.');
+        }
+
+        if ($method === 'php' || !$client || $isGzip) {
+            $this->logger->info('Importing with the PHP importer: ' . $dumpPath);
+            $db = DbConnectionFactory::create(false);
+            try {
+                $importer = new SqlImporter($db, $this->logger);
+                $importer->importFile($dumpPath);
+            } finally {
+                $db->closeConnection();
+            }
+            return true;
+        }
+
+        $this->logger->info('Importing with ' . $client['binary'] . ': ' . $dumpPath);
+        $dbConfig = DbConnectionFactory::getConfig(false);
         $command = sprintf(
-            'mysql -u %s -h%s -p%s %s < %s',
-            escapeshellarg($dbUser),
-            escapeshellarg($dbHost),
-            escapeshellarg($dbPassword),
-            escapeshellarg($dbName),
+            '%s %s %s < %s 2>&1',
+            escapeshellarg($client['binary']),
+            MysqlCli::connectionArgs($dbConfig),
+            escapeshellarg($dbConfig['dbname']),
             escapeshellarg($dumpPath)
         );
 
-        exec($command, $output, $returnVar);
+        [$returnVar, $output] = MysqlCli::run($command, (string) $dbConfig['password']);
 
         if ($returnVar !== 0) {
-            throw new \Exception("Failed to import database dump.");
+            throw new \Exception("Failed to import database dump: " . implode("\n", $output));
         }
         return true;
     }
