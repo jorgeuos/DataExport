@@ -5,12 +5,14 @@ on:
   push:
     branches: [main, 6.x-dev]
   workflow_dispatch:
+  # Also run by the Release workflow before it publishes anything
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
