@@ -1,0 +1,112 @@
+name: Release
+
+# Two ways to release:
+#
+# 1. Actions -> Release -> "Run workflow", and pick the branch: main for 1.x
+#    (Matomo 5) or 6.x-dev for 2.x (Matomo 6). The version is read from
+#    plugin.json and the tag v<version> is created on that commit.
+# 2. Push a tag yourself: git tag v1.2.1 && git push origin v1.2.1
+#
+# Either way the release is checked (versions, CHANGELOG entry, Matomo range),
+# CI must pass, and then a GitHub release is created with the CHANGELOG entry
+# as notes and an installable DataExport-<version>.zip. The Matomo Marketplace
+# picks the new tag up through its webhook as before.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.info.outputs.version }}
+      tag: ${{ steps.info.outputs.tag }}
+      latest: ${{ steps.latest.outputs.latest }}
+      prerelease: ${{ steps.info.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: none
+      - name: Check versions, CHANGELOG and Matomo range
+        id: info
+        env:
+          PUSHED_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          php .github/scripts/release-info.php "$PUSHED_TAG" release-notes.md | tee -a "$GITHUB_OUTPUT"
+          version=$(jq -r .version plugin.json)
+          if [[ "$version" == *-* ]]; then echo "prerelease=true"; else echo "prerelease=false"; fi >> "$GITHUB_OUTPUT"
+      - name: Check that the release doesn't exist yet
+        env:
+          TAG: ${{ steps.info.outputs.tag }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          if [ "$REF_TYPE" = branch ] && git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag $TAG already exists. Bump the version in plugin.json, DataExport.php and CHANGELOG.md first."
+            exit 1
+          fi
+      - name: Decide whether this is the latest release
+        id: latest
+        env:
+          MAJOR: ${{ steps.info.outputs.major }}
+        run: |
+          # A 1.x patch released after 2.0.0 must not become "Latest" on GitHub
+          highest=$(git tag -l 'v*' | sed -E 's/^v([0-9]+).*/\1/' | grep -E '^[0-9]+$' | sort -n | tail -1)
+          if [ -z "$highest" ] || [ "$MAJOR" -ge "$highest" ]; then echo "latest=true"; else echo "latest=false"; fi | tee -a "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+
+  ci:
+    name: CI
+    needs: check
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Publish GitHub release
+    needs: [check, ci]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+      - name: Build DataExport-${{ needs.check.outputs.version }}.zip
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          # The folder inside the zip must be called DataExport for a manual
+          # upload to work; GitHub's own source zip uses DataExport-<version>.
+          git archive --format=zip --prefix=DataExport/ -o "DataExport-$VERSION.zip" HEAD
+          unzip -l "DataExport-$VERSION.zip" | tail -1
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.check.outputs.tag }}
+          VERSION: ${{ needs.check.outputs.version }}
+          LATEST: ${{ needs.check.outputs.latest }}
+          PRERELEASE: ${{ needs.check.outputs.prerelease }}
+        run: |
+          args=(--title "$VERSION" --notes-file release-notes.md --target "$GITHUB_SHA" --latest="$LATEST")
+          if [ "$PRERELEASE" = true ]; then args+=(--prerelease); fi
+          gh release create "$TAG" "DataExport-$VERSION.zip" "${args[@]}"

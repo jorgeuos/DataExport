@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, 6.x-dev]
+  workflow_dispatch:
+  # Also run by the Release workflow before it publishes anything
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: PHP ${{ matrix.php }} syntax
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 1.x supports Matomo 5: PHP 7.2.5 up to the newest PHP release
+        php: ['7.2', '7.4', '8.0', '8.2', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: none
+      - name: Lint plugin files
+        run: |
+          find . -name '*.php' -not -path './vendor/*' -not -path './.git/*' -print0 \
+            | xargs -0 -n1 -P4 php -l -d display_errors=1 > lint.log || { grep -v '^No syntax errors' lint.log; exit 1; }
+          echo "$(wc -l < lint.log) files OK"
+
+  composer:
+    name: Composer and vendor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+      - name: Validate composer.json and composer.lock
+        run: composer validate --no-check-publish --no-check-all
+      - name: Check that vendor/ matches composer.lock
+        run: php .github/scripts/check-vendor.php
+      - name: Security audit (composer audit)
+        run: composer audit --locked
+
+  tests:
+    name: Matomo ${{ matrix.matomo }} / PHP ${{ matrix.php }} / ${{ matrix.db }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - matomo: minimum_required_matomo
+            php: '7.2'
+            db: Mysql
+          - matomo: maximum_supported_matomo
+            php: '8.4'
+            db: Mariadb
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run plugin tests
+        uses: matomo-org/github-action-tests@main
+        with:
+          plugin-name: DataExport
+          php-version: ${{ matrix.php }}
+          test-type: PluginTests
+          matomo-test-branch: ${{ matrix.matomo }}
+          mysql-engine: ${{ matrix.db }}
