@@ -32,6 +32,14 @@
 				<p>
 					<span>
 						<label>
+							<input type="radio" name="download-preference" id="gzip-download" value="gzip" {% if downloadPreference == "gzip" %} checked {% endif %}/>
+							<span>Download as .sql.gz (fastest, recommended for large databases)</span>
+						</label>
+					</span>
+				</p>
+				<p>
+					<span>
+						<label>
 							<input type="radio" name="download-preference" id="zip-download" value="zip" {% if downloadPreference == "zip" %} checked {% endif %}/>
 							<span>Download as .zip</span>
 						</label>
@@ -75,7 +83,7 @@
 				</ul>
 			</p>
 			<p>
-				Select database dump(.sql) to upload:
+				Select database dump (.sql or .sql.gz) to upload:
 				<input type="file" name="dbDump" id="dbDump">
 			</p>
 			<br>

@@ -129,6 +129,66 @@ class MysqlCli
     }
 
     /**
+     * Runs a command and streams its stdout into $path, gzip-compressed when
+     * $path ends in .gz. Compressing while dumping avoids writing the plain
+     * dump first and copying it again for compression, which takes minutes
+     * and doubles the disk space for multi-GB databases.
+     *
+     * @return array [int $returnVar, string $stderr]
+     */
+    public static function runToFile(string $command, string $path, bool $append, string $password): array
+    {
+        $out = @fopen(self::streamPath($path), $append ? 'ab' : 'wb');
+        if ($out === false) {
+            throw new \Exception("Cannot open $path for writing.");
+        }
+
+        $stderrFile = tempnam(sys_get_temp_dir(), 'dataexport');
+        $env = getenv();
+        $env['MYSQL_PWD'] = $password;
+
+        $process = proc_open($command, [
+            0 => ['file', '/dev/null', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['file', $stderrFile, 'w'],
+        ], $pipes, null, $env);
+
+        if (!is_resource($process)) {
+            fclose($out);
+            @unlink($stderrFile);
+            throw new \Exception('Could not start: ' . $command);
+        }
+
+        try {
+            while (!feof($pipes[1])) {
+                $chunk = fread($pipes[1], 1048576);
+                if ($chunk === false) {
+                    break;
+                }
+                if ($chunk !== '' && fwrite($out, $chunk) === false) {
+                    throw new \Exception('Failed to write to the dump file (disk full?).');
+                }
+            }
+        } finally {
+            fclose($pipes[1]);
+            fclose($out);
+            $returnVar = proc_close($process);
+            $stderr = (string) @file_get_contents($stderrFile);
+            @unlink($stderrFile);
+        }
+
+        return [$returnVar, trim($stderr)];
+    }
+
+    /**
+     * File path for fopen(), using the zlib stream wrapper for .gz files.
+     */
+    public static function streamPath(string $path): string
+    {
+        return substr(strtolower($path), -3) === '.gz' ? 'compress.zlib://' . $path : $path;
+    }
+
+    /**
      * Runs a command with MYSQL_PWD set.
      *
      * @return array [int $returnVar, string[] $output]

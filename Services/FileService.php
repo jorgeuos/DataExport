@@ -109,6 +109,9 @@ class FileService {
             return $this->zipDump($dumpPath);
         } elseif ($compress == 'tar') {
             return $this->tarDump($dumpPath);
+        } elseif ($compress == 'gzip') {
+            // Already written compressed by the dumper
+            return $dumpPath;
         } else {
             return $dumpPath;
         }

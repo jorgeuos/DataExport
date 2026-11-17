@@ -181,13 +181,14 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
             if (!in_array($fileType, [
                 'application/octet-stream',
                 'application/sql',
-                'text/plain'
+                'text/plain',
+                'application/gzip',
+                'application/x-gzip',
             ])) {
                 throw new \Exception("Invalid file type.");
             }
-            $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-            if ($fileExt != 'sql') {
-                throw new \Exception("Invalid file extension.");
+            if (!preg_match('/\.sql(\.gz)?$/i', $fileName)) {
+                throw new \Exception("Invalid file extension, expected .sql or .sql.gz.");
             }
 
             $destPath = $uploadDir . $fileName;
@@ -228,12 +229,13 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
      * MariaDB 11+ writes a "/*!999999\- enable the sandbox mode *\/" line first.
      */
     private function looksLikeSqlDump(string $path): bool {
-        $handle = @fopen($path, 'r');
+        // gzopen() also reads uncompressed files
+        $handle = @gzopen($path, 'rb');
         if (!$handle) {
             throw new \Exception("Unable to read uploaded file.");
         }
         try {
-            for ($i = 0; $i < 5 && ($line = fgets($handle)) !== false; $i++) {
+            for ($i = 0; $i < 5 && ($line = gzgets($handle)) !== false; $i++) {
                 if (preg_match('/^-- (MariaDB|MySQL) dump \d+/', $line)
                     || strpos($line, \Piwik\Plugins\DataExport\Services\Dump\PhpSqlDumper::HEADER_SIGNATURE) === 0
                 ) {
@@ -241,7 +243,7 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
                 }
             }
         } finally {
-            fclose($handle);
+            gzclose($handle);
         }
         return false;
     }

@@ -361,7 +361,7 @@ class PhpSqlDumper
      */
     private function openFile(string $path, string $mode)
     {
-        $handle = @fopen($path, $mode);
+        $handle = @fopen(MysqlCli::streamPath($path), $mode);
         if ($handle === false) {
             $error = error_get_last();
             throw new \Exception("Cannot open $path for writing: " . ($error['message'] ?? 'unknown error'));
