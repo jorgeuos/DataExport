@@ -22,8 +22,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 2.x supports Matomo 6: PHP 8.1 up to the newest PHP release
-        php: ['8.1', '8.2', '8.3', '8.4']
+        # 2.x supports Matomo 6: PHP 8.1 to 8.6
+        php: ['8.1', '8.2', '8.3', '8.4', '8.5', '8.6']
     steps:
       - uses: actions/checkout@v7
         with:
@@ -64,16 +64,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # As recommended in https://developer.matomo.org/guides/migrate-matomo-5-to-6:
+        # the matomo6_*_php aliases follow Matomo's supported PHP range, and the
+        # databases are the oldest versions Matomo 6 supports.
         include:
           - matomo: minimum_required_matomo
-            php: '8.1'
+            php: matomo6_min_php
             db: Mysql
-            # Matomo 6 requires MySQL 8.0 or MariaDB 10.6 (the action defaults to MySQL 5.7)
             db-version: '8.0'
           - matomo: maximum_supported_matomo
-            php: '8.4'
+            php: matomo6_max_php
             db: Mariadb
-            db-version: ''
+            db-version: '10.6'
     steps:
       - uses: actions/checkout@v7
         with:
