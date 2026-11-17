@@ -16,8 +16,10 @@ namespace Piwik\Plugins\DataExport\Services\Dump;
  */
 class MysqlCli
 {
-    public const DUMP_BINARIES = ['mysqldump', 'mariadb-dump'];
-    public const CLIENT_BINARIES = ['mysql', 'mariadb'];
+    // mariadb-dump/mariadb first: on MariaDB 11 the mysqldump/mysql names are
+    // deprecated aliases that print a warning on every run.
+    public const DUMP_BINARIES = ['mariadb-dump', 'mysqldump'];
+    public const CLIENT_BINARIES = ['mariadb', 'mysql'];
 
     /** @var array<string, array|null> */
     private static $cache = [];
@@ -50,6 +52,10 @@ class MysqlCli
                 $output = [];
                 $returnVar = 1;
                 @exec(escapeshellarg($binary) . ' --version 2>&1', $output, $returnVar);
+                // Drop warnings such as "Deprecated program name" from the version string
+                $output = array_values(array_filter($output, function ($line) {
+                    return trim($line) !== '' && stripos($line, 'deprecated') === false;
+                }));
                 if ($returnVar === 0 && !empty($output)) {
                     $found = ['binary' => $binary, 'version' => trim(implode(' ', $output))];
                     break;
