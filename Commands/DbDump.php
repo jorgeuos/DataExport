@@ -38,7 +38,7 @@ class DbDump extends ConsoleCommand {
         $this->addOptionalValueOption(
             'compress',
             'c',
-            'Whether to compress the dump file as a .zip or .tar.gz archive. Defaults to none.',
+            'Compression: none, gzip (.sql.gz, compressed while dumping: fastest), zip or tar (.tar.gz). Defaults to none.',
             'none'
         );
         $this->addOptionalValueOption(

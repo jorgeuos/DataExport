@@ -109,6 +109,9 @@ class FileService {
             return $this->zipDump($dumpPath);
         } elseif ($compress == 'tar') {
             return $this->tarDump($dumpPath);
+        } elseif ($compress == 'gzip') {
+            // Already written compressed by the dumper
+            return $dumpPath;
         } else {
             return $dumpPath;
         }
@@ -249,7 +252,10 @@ class FileService {
             ];
         }
         $ignoreFiles = ['.', '..', '.gitignore', '.DS_Store'];
-        $files = array_diff(scandir($path), $ignoreFiles);
+        $files = array_filter(array_diff(scandir($path), $ignoreFiles), function ($file) {
+            // Hidden files, e.g. the backup job status file
+            return $file[0] !== '.';
+        });
         $size = 0;
         foreach ($files as $file) {
             $size += filesize($path . $file);

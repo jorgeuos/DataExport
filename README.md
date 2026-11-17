@@ -60,6 +60,7 @@ I have collected a few queries from the Matomos faq: [How do I write SQL queries
 #### DB commands
 ```bash
 $ ./console db:dump                       # whole database, method from the settings (default: auto)
+$ ./console db:dump -c gzip               # write .sql.gz directly (fastest for large databases)
 $ ./console db:dump --method=php -c tar   # force the built-in PHP dumper, compress as .tar.gz
 $ ./console db:dump-logs -D 2024-02-24 -i 1,2   # log tables for one day and some sites
 $ ./console db:import dump.sql            # also reads .sql.gz
@@ -85,6 +86,11 @@ database, sockets and SSL options), streams rows so memory use stays flat, and r
 a consistent snapshot so tracking isn't blocked. It writes a standard SQL file that can
 be imported with the `mysql` client or with `db:import` / the import form. Imports
 also work without the `mysql` client.
+
+Backups started from the admin page run in the background (a detached
+`./console dataexport:backup-job` process, or after the response when `exec()` is
+disabled), so multi-GB databases don't hit web server or proxy timeouts. The page
+downloads the file when it is ready, and it stays in the backup list.
 
 This is useful for the official Matomo Docker images and other slim containers, and for
 hosts where `exec()` is disabled. The admin page shows which method will be used.

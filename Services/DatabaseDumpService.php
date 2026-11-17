@@ -223,7 +223,8 @@ class DatabaseDumpService {
     /**
      * Dumps the whole database.
      *
-     * @param string $downloadPreference none, zip or tar
+     * @param string $downloadPreference none, gzip, zip or tar. gzip compresses
+     *                                   while dumping and is the fastest for large databases.
      * @param string|null $dumpPath Full path of the .sql file, defaults to the backup folder
      * @param string|null $method auto, mysqldump or php. Defaults to the plugin setting.
      * @return string Path of the (compressed) dump
@@ -239,6 +240,7 @@ class DatabaseDumpService {
         }
 
         $fullPath = $dumpPath ?: $this->backupDir . 'dbdump-' . date('Y-m-d_H-i-s') . '.sql';
+        $fullPath = self::applyGzipExtension($fullPath, $downloadPreference);
 
         $configuredMethod = $method ?: null;
         $method = $this->resolveDumpMethod($configuredMethod);
@@ -261,6 +263,16 @@ class DatabaseDumpService {
         }
 
         return $this->fileService->compressDump($fullPath, $downloadPreference);
+    }
+
+    /**
+     * With gzip, the dump is written compressed right away: name it .sql.gz.
+     */
+    private static function applyGzipExtension(string $path, $downloadPreference): string {
+        if ($downloadPreference === 'gzip' && substr(strtolower($path), -3) !== '.gz') {
+            return $path . '.gz';
+        }
+        return $path;
     }
 
     private function runPhpDump(string $fullPath): void {
@@ -304,17 +316,16 @@ class DatabaseDumpService {
         $dbConfig = $this->getDbConfig();
 
         $command = sprintf(
-            '%s %s 2>&1 > %s',
+            '%s %s',
             $this->getMysqldumpCommand($dbConfig),
-            escapeshellarg($dbConfig['dbname']),
-            escapeshellarg($fullPath)
+            escapeshellarg($dbConfig['dbname'])
         );
         $this->logger->debug('Dump command: ' . $command);
 
-        [$returnVar, $output] = MysqlCli::run($command, (string) $dbConfig['password']);
+        [$returnVar, $stderr] = MysqlCli::runToFile($command, $fullPath, false, (string) $dbConfig['password']);
         if ($returnVar !== 0) {
             @unlink($fullPath);
-            throw new \Exception("Failed to generate database dump with mysqldump: " . implode("\n", $output));
+            throw new \Exception("Failed to generate database dump with mysqldump: " . $stderr);
         }
     }
 
@@ -424,6 +435,7 @@ class DatabaseDumpService {
         }
 
         $fullPath = $dumpPath ?: $this->backupDir . 'logdump-' . ($date ?: 'all') . '-' . date('Y-m-d_H-i-s') . '.sql';
+        $fullPath = self::applyGzipExtension($fullPath, $downloadPreference);
 
         $method = $this->resolveDumpMethod($method);
         $this->logger->info('Backup method: ' . $method);
@@ -444,20 +456,19 @@ class DatabaseDumpService {
                 // Example:
                 // mysqldump --skip-add-drop-table -u root -h localhost matomo matomo_log_action --where="idaction >= 123" >> /path/to/dump.sql
                 $command = sprintf(
-                    '%s --skip-add-drop-table %s %s %s 2>&1 %s %s',
+                    '%s --skip-add-drop-table %s %s %s',
                     $baseCommand,
                     $where ? escapeshellarg('--where=' . $where) : '',
                     escapeshellarg($dbConfig['dbname']),
-                    escapeshellarg($table),
-                    ($first && !$dumpPath) ? '>' : '>>',
-                    escapeshellarg($fullPath)
+                    escapeshellarg($table)
                 );
+                $append = !($first && !$dumpPath);
                 $first = false;
                 $this->logger->debug('Dump command: ' . $command);
 
-                [$returnVar, $output] = MysqlCli::run($command, (string) $dbConfig['password']);
+                [$returnVar, $stderr] = MysqlCli::runToFile($command, $fullPath, $append, (string) $dbConfig['password']);
                 if ($returnVar !== 0) {
-                    throw new \Exception("Failed to dump table $table with mysqldump: " . implode("\n", $output));
+                    throw new \Exception("Failed to dump table $table with mysqldump: " . $stderr);
                 }
             }
         }

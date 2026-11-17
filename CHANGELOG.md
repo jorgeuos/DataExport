@@ -9,7 +9,12 @@
   mysqldump/mariadb-dump isn't installed or exec() is disabled, or when mysqldump fails.
   New "Backup method" setting (auto, mysqldump, php) and --method option for db:dump,
   db:dump-logs and db:import.
-- New: imports work without the mysql client, and db:import reads .sql.gz files.
+- New: imports work without the mysql client, and db:import and the upload form read .sql.gz files.
+- New: backups from the admin page run in the background, so large databases no longer hit
+  web server timeouts. The page shows progress and downloads the file when it is ready.
+- New: "gzip" compression writes .sql.gz while dumping, much faster than zip/tar.gz for large
+  databases. Default for the admin page.
+- Prefer mariadb-dump/mariadb over the deprecated mysqldump/mysql names on MariaDB 11.
 - Fixed: exports with a custom table prefix failed with "Table 'matomo_log_visit' doesn't exist" (#7).
 - Fixed: CSV export returned empty idvisit/idsite for visits without conversions. Visitor IDs
   and IPs are now exported as readable values.

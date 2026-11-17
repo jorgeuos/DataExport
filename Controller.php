@@ -9,6 +9,7 @@
 namespace Piwik\Plugins\DataExport;
 
 use Piwik\Url;
+use Piwik\Common;
 use Piwik\Nonce;
 use Piwik\Piwik;
 use Piwik\Request;
@@ -20,6 +21,7 @@ use \Piwik\Plugins\DataExport\Services\FileService;
 use Piwik\Notification\Manager as NotificationManager;
 use \Piwik\Plugins\DataExport\Services\DatabaseDumpService;
 use \Piwik\Plugins\DataExport\Services\DatabaseImportService;
+use \Piwik\Plugins\DataExport\Services\BackupJobService;
 
 /**
  * A controller lets you for example create a page that can be added to a menu. For more information read our guide
@@ -40,7 +42,7 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
     public function indexHome() {
         Piwik::checkUserHasSuperUserAccess();
 
-        $downloadPreference = UserHelper::getUserPreference('downloadPreference', 'none');
+        $downloadPreference = UserHelper::getUserPreference('downloadPreference', 'gzip');
 
         $dbConfig = \Piwik\Config::getInstance()->database;
         $dbName = $dbConfig['dbname'];
@@ -75,6 +77,7 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
                 'autoDump' => 'none',
                 'csvQuery' => $this->getCsvQueryExample(),
                 'dumpMethod' => $dumpMethod,
+                'backupJob' => $this->formatJobStatus((new BackupJobService())->getStatus()),
                 'nonceDump' => Nonce::getNonce(self::NONCE_DUMP),
                 'nonceUpload' => Nonce::getNonce(self::NONCE_UPLOAD),
                 'nonceDelete' => Nonce::getNonce(self::NONCE_DELETE),
@@ -153,6 +156,72 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
         }
     }
 
+    /**
+     * Starts a database backup in the background (see BackupJobService).
+     * Large databases take longer than web server timeouts allow, so this
+     * returns right away; the page polls backupStatus and downloads the
+     * file when it is ready.
+     */
+    public function startDbDump() {
+        Piwik::checkUserHasSuperUserAccess();
+        if (!Nonce::verifyNonce(self::NONCE_DUMP, Request::fromPost()->getStringParameter('nonce', ''))) {
+            throw new \Exception(Piwik::translate('General_ExceptionSecurityCheckFailed'));
+        }
+
+        $compression = Request::fromPost()->getStringParameter('download-preference', 'gzip');
+        if (!BackupJobService::isValidCompression($compression)) {
+            $compression = 'gzip';
+        }
+        UserHelper::setUserPreference('downloadPreference', $compression);
+
+        $jobs = new BackupJobService();
+        try {
+            $detached = $jobs->start($compression);
+            $response = ['ok' => true, 'status' => $this->formatJobStatus($jobs->getStatus())];
+        } catch (\Exception $e) {
+            $detached = true;
+            $response = ['ok' => false, 'error' => $e->getMessage(), 'status' => $this->formatJobStatus($jobs->getStatus())];
+        }
+
+        $body = json_encode($response);
+        if ($detached) {
+            Common::sendHeader('Content-Type: application/json; charset=utf-8');
+            return $body;
+        }
+        // No background process available: answer first, then dump in this process
+        $jobs->respondAndRun($body);
+        exit;
+    }
+
+    /**
+     * Status of the backup started from this page, as JSON.
+     */
+    public function backupStatus() {
+        Piwik::checkUserHasSuperUserAccess();
+        Common::sendHeader('Content-Type: application/json; charset=utf-8');
+        return json_encode($this->formatJobStatus((new BackupJobService())->getStatus()));
+    }
+
+    private function formatJobStatus(?array $status): ?array {
+        if ($status === null) {
+            return null;
+        }
+        $fileService = new FileService();
+        $file = $status['file'] ?? null;
+        $exists = $file && $fileService->resolveBackupFile($file);
+        return [
+            'state' => $status['state'],
+            'startedAt' => date('Y-m-d H:i:s', (int) $status['startedAt']),
+            'elapsed' => (int) (($status['finishedAt'] ?? time()) - $status['startedAt']),
+            'file' => $exists ? $file : null,
+            'size' => $exists ? $fileService->formatSize((int) ($status['size'] ?? 0)) : null,
+            'downloadUrl' => $exists
+                ? 'index.php?module=DataExport&action=downloadFile&file=' . rawurlencode($file)
+                : null,
+            'error' => $status['error'] ?? null,
+        ];
+    }
+
     public function handleDbUpload() {
         Piwik::checkUserHasSuperUserAccess();
         Nonce::checkNonce(self::NONCE_UPLOAD, Request::fromPost()->getStringParameter('nonce', ''));
@@ -181,13 +250,14 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
             if (!in_array($fileType, [
                 'application/octet-stream',
                 'application/sql',
-                'text/plain'
+                'text/plain',
+                'application/gzip',
+                'application/x-gzip',
             ])) {
                 throw new \Exception("Invalid file type.");
             }
-            $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-            if ($fileExt != 'sql') {
-                throw new \Exception("Invalid file extension.");
+            if (!preg_match('/\.sql(\.gz)?$/i', $fileName)) {
+                throw new \Exception("Invalid file extension, expected .sql or .sql.gz.");
             }
 
             $destPath = $uploadDir . $fileName;
@@ -228,12 +298,13 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
      * MariaDB 11+ writes a "/*!999999\- enable the sandbox mode *\/" line first.
      */
     private function looksLikeSqlDump(string $path): bool {
-        $handle = @fopen($path, 'r');
+        // gzopen() also reads uncompressed files
+        $handle = @gzopen($path, 'rb');
         if (!$handle) {
             throw new \Exception("Unable to read uploaded file.");
         }
         try {
-            for ($i = 0; $i < 5 && ($line = fgets($handle)) !== false; $i++) {
+            for ($i = 0; $i < 5 && ($line = gzgets($handle)) !== false; $i++) {
                 if (preg_match('/^-- (MariaDB|MySQL) dump \d+/', $line)
                     || strpos($line, \Piwik\Plugins\DataExport\Services\Dump\PhpSqlDumper::HEADER_SIGNATURE) === 0
                 ) {
@@ -241,7 +312,7 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
                 }
             }
         } finally {
-            fclose($handle);
+            gzclose($handle);
         }
         return false;
     }

@@ -54,6 +54,7 @@
         "DumpMethodAuto": "Auto: use mysqldump when it is installed, otherwise PHP (recommended)",
         "DumpMethodMysqldump": "Always use mysqldump / mariadb-dump",
         "DumpMethodPhp": "Always use the built-in PHP dumper (no mysqldump needed)",
-        "DumpMethodDesc": "How database backups are created. The PHP dumper works everywhere, also in Docker containers without mysqldump and on hosts where exec() is disabled. mysqldump is usually faster for very large databases."
+        "DumpMethodDesc": "How database backups are created. The PHP dumper works everywhere, also in Docker containers without mysqldump and on hosts where exec() is disabled. mysqldump is usually faster for very large databases.",
+        "AutoDumpCompressionGzip": "GZIP (.sql.gz, compressed while dumping: fastest)"
     }
 }

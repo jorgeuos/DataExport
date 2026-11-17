@@ -19,13 +19,21 @@
 			<small>Change it under <a href="index.php?module=CoreAdminHome&amp;action=generalSettings#/DataExport">General settings &rsaquo; DataExport</a>. Both methods create a standard .sql file that can be imported with the mysql client or with the import below.</small>
 		</p>
 		<p>
-			<form action="{{ linkTo({'action': 'downloadDbDump'}) }}" method="post">
+			<form action="{{ linkTo({'action': 'startDbDump'}) }}" method="post" id="de-backup-form">
 				<input type="hidden" name="nonce" value="{{ nonceDump }}">
 				<p>
 					<span>
 						<label>
 							<input type="radio" name="download-preference" id="no-compression" value="none" {% if downloadPreference == "none" %} checked {% endif %}/>
 							<span>No compression</span>
+						</label>
+					</span>
+				</p>
+				<p>
+					<span>
+						<label>
+							<input type="radio" name="download-preference" id="gzip-download" value="gzip" {% if downloadPreference == "gzip" %} checked {% endif %}/>
+							<span>Download as .sql.gz (fastest, recommended for large databases)</span>
 						</label>
 					</span>
 				</p>
@@ -46,9 +54,26 @@
 					</span>
 				</p>
 				<p>
-					<button type="submit" class="btn btn-primary">Download DB Dump</button>
+					<button type="submit" class="btn btn-primary" id="de-backup-button" {% if backupJob and backupJob.state == 'running' %}disabled{% endif %}>Create backup</button>
 				</p>
 			</form>
+			<p>
+				The backup runs in the background, so large databases don't hit web server timeouts.
+				You can leave this page; finished backups are listed under "Clear Backups" below.
+			</p>
+			<div id="de-backup-status"
+				data-status-url="{{ linkTo({'action': 'backupStatus'}) }}"
+				data-state="{{ backupJob ? backupJob.state : '' }}">
+				{% if backupJob %}
+					{% if backupJob.state == 'running' %}
+						<p class="alert alert-info">Backup running since {{ backupJob.startedAt }}&hellip;</p>
+					{% elseif backupJob.state == 'done' and backupJob.file %}
+						<p class="alert alert-success">Last backup finished: <a href="{{ backupJob.downloadUrl }}">{{ backupJob.file }}</a> ({{ backupJob.size }})</p>
+					{% elseif backupJob.state == 'failed' %}
+						<p class="alert alert-danger">Last backup failed: {{ backupJob.error }}</p>
+					{% endif %}
+				{% endif %}
+			</div>
 		</p>
 	</div>
 
@@ -75,7 +100,7 @@
 				</ul>
 			</p>
 			<p>
-				Select database dump(.sql) to upload:
+				Select database dump (.sql or .sql.gz) to upload:
 				<input type="file" name="dbDump" id="dbDump">
 			</p>
 			<br>

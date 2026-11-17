@@ -103,6 +103,7 @@ class SystemSettings extends \Piwik\Settings\Plugin\SystemSettings {
             $field->uiControl = FieldConfig::UI_CONTROL_RADIO;
             $field->availableValues = [
                 'none' => Piwik::translate('DataExport_AutoDumpNone'),
+                'gzip' => Piwik::translate('DataExport_AutoDumpCompressionGzip'),
                 'zip' => Piwik::translate('DataExport_AutoDumpCompressionZip'),
                 'tar' => Piwik::translate('DataExport_AutoDumpCompressionTarGz'),
             ];
