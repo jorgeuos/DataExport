@@ -88,16 +88,7 @@ FLUSH PRIVILEGES;
 			<b>Example:</b>
 			If you want to export the logs for the 24th of February 2024, you would select the date 2024-02-24.<br>
 			The Query that runs behind the scenes is:
-<pre>
-SELECT *
-FROM matomo_log_visit 
-LEFT JOIN matomo_log_link_visit_action ON matomo_log_visit.idvisit = matomo_log_link_visit_action.idvisit 
-LEFT JOIN matomo_log_action ON matomo_log_action.idaction = matomo_log_link_visit_action.idaction_url 
-LEFT JOIN matomo_log_conversion ON matomo_log_visit.idvisit = matomo_log_conversion.idvisit 
-LEFT JOIN matomo_log_conversion_item ON matomo_log_visit.idvisit = matomo_log_conversion_item.idvisit
-WHERE visit_last_action_time >= "2024-02-24 00:00:00"
-AND visit_last_action_time <= "2024-02-24 23:59:59";
-</pre>
+<pre>{{ csvQuery }}</pre>
 		</p>
 		<form action="{{ linkTo({ 'module': 'DataExport', 'action': 'selectAllVisitsAndActions', }) }}" method="post">
 			<input type="hidden" name="idSite" value="0">

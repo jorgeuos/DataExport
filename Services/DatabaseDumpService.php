@@ -272,7 +272,7 @@ class DatabaseDumpService {
     }
 
     /**
-     * Get the minimum idaction_url from matomo_log_link_visit_action for a given date.
+     * Get the minimum idaction_url from the log_link_visit_action table for a given date.
      */
     public function getLogActionMinId($date) {
         // Prepare start and end dates with proper formatting
@@ -281,9 +281,9 @@ class DatabaseDumpService {
 
         // SQL query with positional parameters
         $sql = "SELECT MIN(idaction_url) AS min_idaction
-                FROM matomo_log_link_visit_action
+                FROM " . Common::prefixTable('log_link_visit_action') . "
                 WHERE server_time >= ?
-                AND server_time < ?";
+                AND server_time <= ?";
 
         // Provide parameters in the correct order
         $parameters = [$startDate, $endDate];
@@ -405,6 +405,91 @@ class DatabaseDumpService {
     }
 
     /**
+     * Tables joined by the "select all visits and actions" export, in join order.
+     * Alias => unprefixed table name.
+     */
+    private const VISITS_AND_ACTIONS_TABLES = [
+        'mlv' => 'log_visit',
+        'mllva' => 'log_link_visit_action',
+        'mla' => 'log_action',
+        'mlc' => 'log_conversion',
+        'mlci' => 'log_conversion_item',
+    ];
+
+    /**
+     * Binary columns that are converted to readable values in exports.
+     */
+    private const HEX_COLUMNS = ['idvisitor', 'config_id'];
+    private const IP_COLUMNS = ['location_ip'];
+
+    /**
+     * Returns the FROM/JOIN/WHERE part of the "select all visits and actions"
+     * query, using the configured table prefix
+     * (see https://github.com/jorgeuos/DataExport/issues/7).
+     *
+     * Parameters: visit_last_action_time start and end, optionally followed by
+     * an `AND mlv.idsite = ?` condition added by the caller.
+     */
+    public static function getSelectAllVisitsAndActionsFromSql(): string {
+        $t = [];
+        foreach (self::VISITS_AND_ACTIONS_TABLES as $alias => $table) {
+            $t[$alias] = Common::prefixTable($table);
+        }
+
+        return "FROM `{$t['mlv']}` AS mlv
+                    LEFT JOIN `{$t['mllva']}` AS mllva ON mlv.idvisit = mllva.idvisit
+                    LEFT JOIN `{$t['mla']}` AS mla ON mla.idaction = mllva.idaction_url
+                    LEFT JOIN `{$t['mlc']}` AS mlc ON mlv.idvisit = mlc.idvisit
+                    LEFT JOIN `{$t['mlci']}` AS mlci ON mlv.idvisit = mlci.idvisit
+                    WHERE mlv.visit_last_action_time >= ?
+                    AND mlv.visit_last_action_time <= ?";
+    }
+
+    /**
+     * Builds an explicit column list for the export.
+     *
+     * Several joined tables share column names (idvisit, idsite, idvisitor,
+     * server_time, ...). With `SELECT *` the value of the *last* table won, so
+     * a visit without conversions got an empty idvisit and idsite from the
+     * LEFT JOINed conversion tables. Here the first table that has a column
+     * wins, which keeps the same CSV header as before but with correct values.
+     */
+    public function getSelectAllVisitsAndActionsColumns(): string {
+        $seen = [];
+        $columns = [];
+        foreach (self::VISITS_AND_ACTIONS_TABLES as $alias => $table) {
+            $tableColumns = $this->db->fetchCol('SHOW COLUMNS FROM `' . Common::prefixTable($table) . '`');
+            foreach ($tableColumns as $column) {
+                if (isset($seen[$column])) {
+                    continue;
+                }
+                $seen[$column] = true;
+                $columns[] = $alias . '.`' . $column . '`';
+            }
+        }
+        return implode(', ', $columns);
+    }
+
+    /**
+     * Converts binary columns to readable values (hex visitor IDs, IP addresses),
+     * so the data can be written to CSV and encoded as JSON by the API.
+     */
+    public static function formatExportRow(array $row): array {
+        foreach (self::HEX_COLUMNS as $column) {
+            if (isset($row[$column]) && $row[$column] !== '') {
+                $row[$column] = bin2hex($row[$column]);
+            }
+        }
+        foreach (self::IP_COLUMNS as $column) {
+            if (isset($row[$column]) && $row[$column] !== '') {
+                $ip = @inet_ntop($row[$column]);
+                $row[$column] = $ip !== false ? $ip : bin2hex($row[$column]);
+            }
+        }
+        return $row;
+    }
+
+    /**
      * Select all visits and actions data for a given date range.
      *
      * It's likely that there's a subtle quirk in how Matomo’s DB abstraction processes named parameters.
@@ -417,14 +502,8 @@ class DatabaseDumpService {
 
         try {
             // Base SQL query with placeholders
-            $sql = 'SELECT * 
-                    FROM matomo_log_visit AS mlv
-                    LEFT JOIN matomo_log_link_visit_action ON mlv.idvisit = matomo_log_link_visit_action.idvisit 
-                    LEFT JOIN matomo_log_action ON matomo_log_action.idaction = matomo_log_link_visit_action.idaction_url 
-                    LEFT JOIN matomo_log_conversion ON mlv.idvisit = matomo_log_conversion.idvisit 
-                    LEFT JOIN matomo_log_conversion_item ON mlv.idvisit = matomo_log_conversion_item.idvisit
-                    WHERE visit_last_action_time >= ?
-                    AND visit_last_action_time <= ?';
+            $sql = 'SELECT ' . $this->getSelectAllVisitsAndActionsColumns() . ' '
+                . self::getSelectAllVisitsAndActionsFromSql();
 
             // Add conditionally for siteId
             $parameters = [
@@ -441,6 +520,7 @@ class DatabaseDumpService {
 
             // Use a prepared statement with parameterized values
             $data = $this->db->fetchAll($sql, $parameters);
+            $data = array_map([self::class, 'formatExportRow'], $data);
         } catch (\Exception $e) {
             $msg = $e->getMessage();
             $this->logger->error('Error exporting data to CSV: ' . $msg);

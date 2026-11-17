@@ -64,8 +64,21 @@ class Controller extends \Piwik\Plugin\ControllerAdmin {
                 'clear_backups' => Piwik::translate('DataExport_ClearBackups'),
                 'settings' => Piwik::translate('DataExport_Settings'),
                 'autoDump' => 'none',
+                'csvQuery' => $this->getCsvQueryExample(),
             )
         );
+    }
+
+    /**
+     * The CSV export query as it runs, with the configured table prefix, for display.
+     */
+    private function getCsvQueryExample(): string {
+        $sql = "SELECT <all columns of the joined tables, the first table wins on duplicate names>\n"
+            . DatabaseDumpService::getSelectAllVisitsAndActionsFromSql();
+        $sql = preg_replace('/\?/', '"2024-02-24 00:00:00"', $sql, 1);
+        $sql = preg_replace('/\?/', '"2024-02-24 23:59:59"', $sql, 1);
+        // Normalize indentation for display
+        return preg_replace('/^\s+/m', '', $sql) . ';';
     }
 
     /**
