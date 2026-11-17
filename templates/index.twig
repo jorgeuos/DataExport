@@ -15,6 +15,7 @@ FLUSH PRIVILEGES;
 		</p>
 		<p>
 			<form action="{{ linkTo({'action': 'downloadDbDump'}) }}" method="post">
+				<input type="hidden" name="nonce" value="{{ nonceDump }}">
 				<p>
 					<span>
 						<label>
@@ -48,6 +49,7 @@ FLUSH PRIVILEGES;
 
 	<div vue-entry="CoreHome.ContentBlock" content-title="{{ import_title }}" rate="true">
 		<form action="{{ linkTo({'action': 'handleDbUpload'}) }}" method="post" enctype="multipart/form-data">
+			<input type="hidden" name="nonce" value="{{ nonceUpload }}">
 			<p>
 				This is a great feature if you need to import a database dump into your local machine.
 																        If you are using this feature on your production server, make sure that you know
@@ -114,6 +116,7 @@ FLUSH PRIVILEGES;
 	
 	<div vue-entry="CoreHome.ContentBlock" content-title="{{ clear_backups }}" rate="true">
 		<form action="{{ linkTo({'action': 'deleteFiles'}) }}" method="post" enctype="multipart/form-data">
+			<input type="hidden" name="nonce" value="{{ nonceDelete }}">
 			<p>
 				For your performance, you can delete the database dumps.
 			</p>
