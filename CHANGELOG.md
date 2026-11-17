@@ -1,5 +1,9 @@
 ## Changelog
 
+2.0.0
+- Matomo 6 compatibility (#8). Requires Matomo 6 and PHP 8.1. Same features as 1.2.0;
+  1.x stays available for Matomo 5.
+
 1.2.0
 - New: backups work without mysqldump. A built-in PHP dumper is used automatically when
   mysqldump/mariadb-dump isn't installed or exec() is disabled, or when mysqldump fails.
